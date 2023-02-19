@@ -6,6 +6,7 @@
 
 #ifdef VERTEX_SHADER
 
+#if !pGL_ES
 out gl_PerVertex {
     vec4 gl_Position;
     float gl_PointSize;
@@ -13,6 +14,7 @@ out gl_PerVertex {
     float gl_ClipDistance[1];
 #endif
 };
+#endif
 
 #endif
 
@@ -20,6 +22,7 @@ out gl_PerVertex {
 
 #ifdef GEOMETRY_SHADER
 
+#if !pGL_ES
 in gl_PerVertex {
     vec4 gl_Position;
     float gl_PointSize;
@@ -35,6 +38,7 @@ out gl_PerVertex {
     float gl_ClipDistance[1];
 #endif
 };
+#endif
 
 #endif
 
@@ -45,25 +49,25 @@ out gl_PerVertex {
 // even if only one was updated.
 
 #ifdef FRAGMENT_SHADER
-layout(std140, binding = 15) uniform cb15
+layout(std140, binding = 2) uniform cb15
 {
     ivec4 ScalingFactor;
     ivec4 ChannelShuffle;
 
     int EMODA;
     int EMODC;
-    ivec2 pad_cb15;
+    int _pad0;
+    int _pad1;
 };
 #endif
 
 #if defined(VERTEX_SHADER) || defined(GEOMETRY_SHADER)
-layout(std140, binding = 20) uniform cb20
+layout(std140, binding = 1) uniform cb20
 {
     vec2  VertexScale;
     vec2  VertexOffset;
 
-    vec2  TextureScale;
-    vec2  TextureOffset;
+    vec4  TextureOffset;
 
     vec2  PointSize;
     uint  MaxDepth;
@@ -72,7 +76,7 @@ layout(std140, binding = 20) uniform cb20
 #endif
 
 #if defined(VERTEX_SHADER) || defined(FRAGMENT_SHADER)
-layout(std140, binding = 21) uniform cb21
+layout(std140, binding = 0) uniform cb21
 {
     vec3 FogColor;
     float AREF;
@@ -80,7 +84,7 @@ layout(std140, binding = 21) uniform cb21
     vec4 WH;
 
     vec2 TA;
-    float MaxDepthPS;
+    float pad0_cb21;
     float Af;
 
     uvec4 MskFix;
@@ -91,8 +95,11 @@ layout(std140, binding = 21) uniform cb21
 
     vec4 MinMax;
 
-    vec2 pad_cb21;
+    vec2 TextureScale;
     vec2 TC_OffsetHack;
+
+    vec3 pad1_cb21;
+    float MaxDepthPS;
 
     mat4 DitherMatrix;
 };
@@ -111,3 +118,21 @@ layout(std140, binding = 21) uniform cb21
 layout(binding = 0) uniform sampler2D TextureSampler;
 
 #endif
+
+float unscale_depth(float d)
+{
+#if HAS_CLIP_CONTROL
+    return d;
+#else
+    return d * (exp2(24.0f) / exp2(32.0f));
+#endif
+}
+
+float scale_depth(float d)
+{
+#if HAS_CLIP_CONTROL
+    return d;
+#else
+    return d * (exp2(32.0f) / exp2(24.0f));
+#endif
+}

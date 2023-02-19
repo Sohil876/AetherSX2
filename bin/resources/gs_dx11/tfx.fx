@@ -410,23 +410,6 @@ float4 fetch_red(int2 xy)
 	return sample_p(rt.r) * 255.0f;
 }
 
-float4 fetch_green(int2 xy)
-{
-	float4 rt;
-
-	if ((PS_DEPTH_FMT == 1) || (PS_DEPTH_FMT == 2))
-	{
-		int depth = (fetch_raw_depth(xy) >> 8) & 0xFF;
-		rt = (float4)(depth) / 255.0f;
-	}
-	else
-	{
-		rt = fetch_raw_color(xy);
-	}
-
-	return sample_p(rt.g) * 255.0f;
-}
-
 float4 fetch_blue(int2 xy)
 {
 	float4 rt;
@@ -442,6 +425,12 @@ float4 fetch_blue(int2 xy)
 	}
 
 	return sample_p(rt.b) * 255.0f;
+}
+
+float4 fetch_green(int2 xy)
+{
+	float4 rt = fetch_raw_color(xy);
+	return sample_p(rt.g) * 255.0f;
 }
 
 float4 fetch_alpha(int2 xy)
@@ -678,24 +667,6 @@ void ps_dither(inout float3 C, float2 pos_xy)
 	}
 }
 
-void ps_color_clamp_wrap(inout float3 C)
-{
-	// When dithering the bottom 3 bits become meaningless and cause lines in the picture
-	// so we need to limit the color depth on dithered items
-	if (SW_BLEND || PS_DITHER)
-	{
-		// Standard Clamp
-		if (PS_COLCLIP == 0 && PS_HDR == 0)
-			C = clamp(C, (float3)0.0f, (float3)255.0f);
-
-		// In 16 bits format, only 5 bits of color are used. It impacts shadows computation of Castlevania
-		if (PS_DFMT == FMT_16)
-			C = (float3)((int3)C & (int3)0xF8);
-		else if (PS_COLCLIP == 1 && PS_HDR == 0)
-			C = (float3)((int3)C & (int3)0xFF);
-	}
-}
-
 void ps_blend(inout float4 Color, float As, float2 pos_xy)
 {
 	if (SW_BLEND)
@@ -706,17 +677,33 @@ void ps_blend(inout float4 Color, float As, float2 pos_xy)
 
 		float3 Cd = RT.rgb;
 		float3 Cs = Color.rgb;
+		float3 Cv;
 
 		float3 A = (PS_BLEND_A == 0) ? Cs : ((PS_BLEND_A == 1) ? Cd : (float3)0.0f);
 		float3 B = (PS_BLEND_B == 0) ? Cs : ((PS_BLEND_B == 1) ? Cd : (float3)0.0f);
 		float3 C = (PS_BLEND_C == 0) ? As : ((PS_BLEND_C == 1) ? Ad : Af);
 		float3 D = (PS_BLEND_D == 0) ? Cs : ((PS_BLEND_D == 1) ? Cd : (float3)0.0f);
 
-		Color.rgb = (PS_BLEND_A == PS_BLEND_B) ? D : trunc(((A - B) * C) + D);
+		Cv = (PS_BLEND_A == PS_BLEND_B) ? D : trunc(((A - B) * C) + D);
 
 		// PABE
 		if (PS_PABE)
-			Color.rgb = (As >= 1.0f) ? Color.rgb : Cs;
+			Cv = (Color.a >= 128.0f) ? Cv : Color.rgb;
+
+		// Dithering
+		ps_dither(Cv, pos_xy);
+
+		// Standard Clamp
+		if (PS_COLCLIP == 0 && PS_HDR == 0)
+			Cv = clamp(Cv, (float3)0.0f, (float3)255.0f);
+
+		// In 16 bits format, only 5 bits of color are used. It impacts shadows computation of Castlevania
+		if (PS_DFMT == FMT_16)
+			Cv = (float3)((int3)Cv & (int3)0xF8);
+		else if (PS_COLCLIP == 1 && PS_HDR == 0)
+			Cv = (float3)((int3)Cv & (int3)0xFF);
+
+		Color.rgb = Cv;
 	}
 }
 
@@ -768,14 +755,21 @@ PS_OUTPUT ps_main(PS_INPUT input)
 		if (C.a < A_one) C.a += A_one;
 	}
 
+	if (!SW_BLEND)
+		ps_dither(C.rgb, input.p.xy);
+
 	ps_blend(C, alpha_blend, input.p.xy);
 
-	ps_dither(C.rgb, input.p.xy);
-
-	// Color clamp/wrap needs to be done after sw blending and dithering
-	ps_color_clamp_wrap(C.rgb);
-
 	ps_fbmask(C, input.p.xy);
+
+	// When dithering the bottom 3 bits become meaningless and cause lines in the picture
+	// so we need to limit the color depth on dithered items
+	// SW_BLEND already deals with this so no need to do in those cases
+	if (!SW_BLEND && PS_DITHER && PS_DFMT == FMT_16 && !PS_COLCLIP)
+	{
+		C.rgb = clamp(C.rgb, (float3)0.0f, (float3)255.0f);
+		C.rgb = (uint3)((uint3)C.rgb & (uint3)0xF8);
+	}
 
 	output.c0 = C / 255.0f;
 	output.c1 = (float4)(alpha_blend);

@@ -26,8 +26,15 @@ void SetCPUState(SSE_MXCSR sseMXCSR, SSE_MXCSR sseVUMXCSR)
 {
 	//Msgbox::Alert("SetCPUState: Config.sseMXCSR = %x; Config.sseVUMXCSR = %x \n", Config.sseMXCSR, Config.sseVUMXCSR);
 
+	sseMXCSR.DenormalsAreZero = 1;
+	sseVUMXCSR.DenormalsAreZero = 1;
+
 	g_sseMXCSR   = sseMXCSR.ApplyReserveMask();
 	g_sseVUMXCSR = sseVUMXCSR.ApplyReserveMask();
 
+#if defined(_M_X86_32) || defined(_M_X86_64)
 	_mm_setcsr(g_sseMXCSR.bitmask);
+#elif defined(_M_ARM64)
+	a64_setfpcr(MXCSRToFPCR(g_sseMXCSR.bitmask));
+#endif
 }

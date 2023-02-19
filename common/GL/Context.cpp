@@ -31,6 +31,8 @@
 #include "common/GL/ContextWGL.h"
 #elif defined(__APPLE__)
 #include "common/GL/ContextAGL.h"
+#elif defined(__ANDROID__)
+#include "common/GL/ContextEGLAndroid.h"
 #else
 #ifdef X11_API
 #include "common/GL/ContextEGLX11.h"
@@ -104,6 +106,9 @@ namespace GL
 		context = ContextWGL::Create(wi, versions_to_try, num_versions_to_try);
 #elif defined(__APPLE__)
 		context = ContextAGL::Create(wi, versions_to_try, num_versions_to_try);
+#elif defined(__ANDROID__)
+		if (wi.type == WindowInfo::Type::Android)
+			context = ContextEGLAndroid::Create(wi, versions_to_try, num_versions_to_try);
 #endif
 
 #if defined(X11_API)

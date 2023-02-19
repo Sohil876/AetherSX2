@@ -46,6 +46,7 @@ namespace soundtouch
 class InterpolateShannon : public TransposerBase
 {
 protected:
+    void resetRegisters();
     int transposeMono(SAMPLETYPE *dest, 
                         const SAMPLETYPE *src, 
                         int &srcSamples);
@@ -60,13 +61,6 @@ protected:
 
 public:
     InterpolateShannon();
-
-    void resetRegisters();
-
-    int getLatency() const
-    {
-        return 3;
-    }
 };
 
 }

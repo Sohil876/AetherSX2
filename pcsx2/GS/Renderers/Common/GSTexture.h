@@ -19,46 +19,32 @@
 
 class GSTexture
 {
-public:
-	struct GSMap
-	{
-		u8* bits;
-		int pitch;
-	};
-
-	enum class Type
-	{
-		Invalid = 0,
-		RenderTarget = 1,
-		DepthStencil,
-		Texture,
-		Offscreen,
-		Backbuffer,
-		SparseRenderTarget,
-		SparseDepthStencil,
-	};
-
-	enum class Format
-	{
-		Invalid = 0,  ///< Used for initialization
-		Backbuffer,   ///< For displaying to the screen
-		Color,        ///< Standard (RGBA8) color texture
-		FloatColor,   ///< Float-based color texture for colclip emulation (RGBA32F)
-		DepthStencil, ///< Depth stencil texture
-		UNorm8,       ///< A8UNorm texture for paletted textures and the OSD font
-		UInt16,       ///< UInt16 texture for reading back 16-bit depth
-		UInt32,       ///< UInt32 texture for reading back 24 and 32-bit depth
-		Int32,        ///< Int32 texture for date emulation
-	};
-
 protected:
 	GSVector2 m_scale;
 	GSVector2i m_size;
 	GSVector2i m_committed_size;
 	GSVector2i m_gpu_page_size;
-	Type m_type;
-	Format m_format;
+	int m_type;
+	int m_format;
 	bool m_sparse;
+	bool m_discarded;
+
+public:
+	struct GSMap
+	{
+		uint8* bits;
+		int pitch;
+	};
+
+	enum
+	{
+		RenderTarget = 1,
+		DepthStencil,
+		Texture,
+		Offscreen,
+		SparseRenderTarget,
+		SparseDepthStencil
+	};
 
 public:
 	GSTexture();
@@ -70,12 +56,15 @@ public:
 		return false;
 	}
 
+	// Returns the native handle of a texture.
+	virtual void* GetNativeHandle() const = 0;
+
 	virtual bool Update(const GSVector4i& r, const void* data, int pitch, int layer = 0) = 0;
 	virtual bool Map(GSMap& m, const GSVector4i* r = NULL, int layer = 0) = 0;
 	virtual void Unmap() = 0;
 	virtual void GenerateMipmap() {}
 	virtual bool Save(const std::string& fn) = 0;
-	virtual u32 GetID() { return 0; }
+	virtual uint32 GetID() { return 0; }
 
 	GSVector2 GetScale() const { return m_scale; }
 	void SetScale(const GSVector2& scale) { m_scale = scale; }
@@ -84,8 +73,8 @@ public:
 	int GetHeight() const { return m_size.y; }
 	GSVector2i GetSize() const { return m_size; }
 
-	Type GetType() const { return m_type; }
-	Format GetFormat() const { return m_format; }
+	int GetType() const { return m_type; }
+	int GetFormat() const { return m_format; }
 
 	virtual void CommitPages(const GSVector2i& region, bool commit) {}
 	void CommitRegion(const GSVector2i& region);
@@ -104,5 +93,13 @@ public:
 	float OffsetHack_mody;
 
 	// Typical size of a RGBA texture
-	virtual u32 GetMemUsage() { return m_size.x * m_size.y * 4; }
+	virtual uint32 GetMemUsage() { return m_size.x * m_size.y * 4; }
+
+	void SetDiscarded() { m_discarded = true; }
+	bool CheckDiscarded()
+	{
+		bool ret = m_discarded;
+		m_discarded = false;
+		return ret;
+	}
 };

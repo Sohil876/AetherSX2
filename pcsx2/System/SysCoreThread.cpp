@@ -35,8 +35,12 @@ extern WindowInfo g_gs_window_info;
 #include "DEV9/DEV9.h"
 #include "USB/USB.h"
 #include "MemoryCardFile.h"
-#include "PAD/Gamepad.h"
 #include "PerformanceMetrics.h"
+#ifdef _WIN32
+#include "PAD/Windows/PAD.h"
+#else
+#include "PAD/Linux/PAD.h"
+#endif
 
 #include "DebugTools/MIPSAnalyst.h"
 #include "DebugTools/SymbolMap.h"
@@ -49,7 +53,9 @@ extern WindowInfo g_gs_window_info;
 #include <wx/msw/wrapwin.h>
 #endif
 
+#if defined(_M_X86_32) || defined(_M_X86_64)
 #include "common/emitter/x86_intrin.h"
+#endif
 
 bool g_CDVDReset = false;
 
@@ -183,7 +189,11 @@ void SysCoreThread::ApplySettings(const Pcsx2Config& src)
 	m_resetProfilers = (src.Profiler != EmuConfig.Profiler);
 	m_resetVsyncTimers = (src.GS != EmuConfig.GS);
 
+	const bool gs_settings_changed = (EmuConfig.GS != src.GS);
+
 	EmuConfig.CopyConfig(src);
+	if (gs_settings_changed && GetMTGS().IsOpen())
+		GetMTGS().ApplySettings();
 }
 
 // --------------------------------------------------------------------------------------
@@ -297,7 +307,11 @@ void SysCoreThread::ExecuteTaskInThread()
 	Threading::EnableHiresScheduler(); // Note that *something* in SPU2 and GS also set the timer resolution to 1ms.
 	m_sem_event.WaitWithoutYield();
 
+#if defined(_M_X86_32) || defined(_M_X86_64)
 	m_mxcsr_saved.bitmask = _mm_getcsr();
+#elif defined(_M_ARM64)
+	m_fpcr_saved.bitmask = a64_getfpcr();
+#endif
 
 	PCSX2_PAGEFAULT_PROTECT
 	{
@@ -362,7 +376,12 @@ void SysCoreThread::OnCleanupInThread()
 	DEV9shutdown();
 	GetMTGS().Cancel();
 
+	// TODO: ARM
+#if defined(_M_X86_32) || defined(_M_X86_64)
 	_mm_setcsr(m_mxcsr_saved.bitmask);
+#elif defined(_M_ARM64)
+  a64_setfpcr(m_fpcr_saved.bitmask);
+#endif
 	Threading::DisableHiresScheduler();
 	_parent::OnCleanupInThread();
 

@@ -128,12 +128,9 @@ void OutputIsoFile::WriteBuffer(const void* src, size_t size)
 	{
 		int err = errno;
 		if (!err)
-		{
-			throw Exception::BadStream(StringUtil::UTF8StringToWxString(m_filename))
-				.SetDiagMsg(pxsFmt(L"An error occurred while writing %u bytes to file", size));
-		}
+			throw Exception::BadStream(m_filename).SetDiagMsg(pxsFmt(L"An error occurred while writing %u bytes to file", size));
 
-		ScopedExcept ex(Exception::FromErrno(StringUtil::UTF8StringToWxString(m_filename), err));
+		ScopedExcept ex(Exception::FromErrno(m_filename, err));
 		ex->SetDiagMsg(pxsFmt(L"An error occurred while writing %u bytes to file: %s", size, WX_STR(ex->DiagMsg())));
 		ex->Rethrow();
 	}

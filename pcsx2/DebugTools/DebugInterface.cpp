@@ -167,26 +167,38 @@ private:
 
 bool DebugInterface::isAlive()
 {
+#ifndef PCSX2_CORE
 	return GetCoreThread().IsOpen() && g_FrameCount > 0;
+#else
+  return false;
+#endif
 }
 
 bool DebugInterface::isCpuPaused()
 {
+#ifndef PCSX2_CORE
 	return GetCoreThread().IsPaused();
+#else
+  return false;
+#endif
 }
 
 void DebugInterface::pauseCpu()
 {
+#ifndef PCSX2_CORE
 	SysCoreThread& core = GetCoreThread();
 	if (!core.IsPaused())
 		core.Pause({}, true);
+#endif
 }
 
 void DebugInterface::resumeCpu()
 {
+#ifndef PCSX2_CORE
 	SysCoreThread& core = GetCoreThread();
 	if (core.IsPaused())
 		core.Resume();
+#endif
 }
 
 
@@ -283,7 +295,7 @@ u64 R5900DebugInterface::read64(u32 address)
 
 u128 R5900DebugInterface::read128(u32 address)
 {
-	alignas(16) u128 result;
+	__aligned16 u128 result;
 	if (!isValidAddress(address) || address % 16)
 	{
 		result.hi = result.lo = -1;
@@ -635,7 +647,10 @@ bool R5900DebugInterface::isValidAddress(u32 addr)
 		case 0xA:
 		case 0xB:
 			// [ 8000_0000 - BFFF_FFFF ] kernel
-			return true;
+			// We only need to access the EE kernel (which is 1 MB large)
+			if (lopart < 0x100000)
+				return true;
+			break;
 		case 0xF:
 			// [ 8000_0000 - BFFF_FFFF ] IOP or kernel stack
 			if (lopart >= 0xfff8000)

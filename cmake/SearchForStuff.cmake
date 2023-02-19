@@ -11,13 +11,29 @@ if (WIN32)
 	add_subdirectory(3rdparty/libjpeg EXCLUDE_FROM_ALL)
 	add_subdirectory(3rdparty/libsamplerate EXCLUDE_FROM_ALL)
 	add_subdirectory(3rdparty/baseclasses EXCLUDE_FROM_ALL)
-	add_subdirectory(3rdparty/freetype EXCLUDE_FROM_ALL)
 	add_subdirectory(3rdparty/portaudio EXCLUDE_FROM_ALL)
 	add_subdirectory(3rdparty/pthreads4w EXCLUDE_FROM_ALL)
 	add_subdirectory(3rdparty/soundtouch EXCLUDE_FROM_ALL)
 	add_subdirectory(3rdparty/wil EXCLUDE_FROM_ALL)
 	add_subdirectory(3rdparty/wxwidgets3.0 EXCLUDE_FROM_ALL)
 	add_subdirectory(3rdparty/xz EXCLUDE_FROM_ALL)
+elseif (ANDROID)
+	add_subdirectory(3rdparty/zlib EXCLUDE_FROM_ALL)
+	add_subdirectory(3rdparty/libpng EXCLUDE_FROM_ALL)
+	add_subdirectory(3rdparty/libjpeg EXCLUDE_FROM_ALL)
+	add_subdirectory(3rdparty/libsamplerate EXCLUDE_FROM_ALL)
+	add_subdirectory(3rdparty/baseclasses EXCLUDE_FROM_ALL)
+	add_subdirectory(3rdparty/soundtouch EXCLUDE_FROM_ALL)
+	add_subdirectory(3rdparty/wxwidgets3.0 EXCLUDE_FROM_ALL)
+	add_subdirectory(3rdparty/xz EXCLUDE_FROM_ALL)
+	add_subdirectory(3rdparty/libaio EXCLUDE_FROM_ALL)
+	add_subdirectory(3rdparty/oboe EXCLUDE_FROM_ALL)
+	make_imported_target_if_missing(LibXml2::LibXml2 LibXml2)
+	make_imported_target_if_missing(ALSA::ALSA ALSA)
+
+	include(CheckLib)
+	check_lib(EGL EGL EGL/egl.h)
+	set(CUBEB_API OFF)
 else()
 	## Use cmake package to find module
 	if (Linux)
@@ -27,7 +43,6 @@ else()
 	find_package(PCAP REQUIRED)
 	find_package(LibXml2 REQUIRED)
 	make_imported_target_if_missing(LibXml2::LibXml2 LibXml2)
-	find_package(Freetype REQUIRED) # GS OSD
 	find_package(Gettext) # translation tool
 	find_package(LibLZMA REQUIRED)
 	make_imported_target_if_missing(LibLZMA::LibLZMA LIBLZMA)
@@ -39,74 +54,81 @@ else()
 	find_package(PNG REQUIRED)
 	find_package(Vtune)
 
-	# Does not require the module (allow to compile non-wx plugins)
-	# Force the unicode build (the variable is only supported on cmake 2.8.3 and above)
-	# Warning do not put any double-quote for the argument...
-	# set(wxWidgets_CONFIG_OPTIONS --unicode=yes --debug=yes) # In case someone want to debug inside wx
-	#
-	# Fedora uses an extra non-standard option ... Arch must be the first option.
-	# They do uname -m if missing so only fix for cross compilations.
-	# http://pkgs.fedoraproject.org/cgit/wxGTK.git/plain/wx-config
-	if(Fedora AND CMAKE_CROSSCOMPILING)
-		set(wxWidgets_CONFIG_OPTIONS --arch ${PCSX2_TARGET_ARCHITECTURES} --unicode=yes)
-	else()
-		set(wxWidgets_CONFIG_OPTIONS --unicode=yes)
-	endif()
+	if (NOT PCSX2_CORE)
+		# Does not require the module (allow to compile non-wx plugins)
+		# Force the unicode build (the variable is only supported on cmake 2.8.3 and above)
+		# Warning do not put any double-quote for the argument...
+		# set(wxWidgets_CONFIG_OPTIONS --unicode=yes --debug=yes) # In case someone want to debug inside wx
+		#
+		# Fedora uses an extra non-standard option ... Arch must be the first option.
+		# They do uname -m if missing so only fix for cross compilations.
+		# http://pkgs.fedoraproject.org/cgit/wxGTK.git/plain/wx-config
+		if(Fedora AND CMAKE_CROSSCOMPILING)
+			set(wxWidgets_CONFIG_OPTIONS --arch ${PCSX2_TARGET_ARCHITECTURES} --unicode=yes)
+		else()
+			set(wxWidgets_CONFIG_OPTIONS --unicode=yes)
+		endif()
 
-	# I'm removing the version check, because it excludes newer versions and requires specifically 3.0.
-	#list(APPEND wxWidgets_CONFIG_OPTIONS --version=3.0)
+		# I'm removing the version check, because it excludes newer versions and requires specifically 3.0.
+		#list(APPEND wxWidgets_CONFIG_OPTIONS --version=3.0)
 
-	# The wx version must be specified so a mix of gtk2 and gtk3 isn't used
-	# as that can cause compile errors.
-	if(GTK2_API AND NOT APPLE)
-		list(APPEND wxWidgets_CONFIG_OPTIONS --toolkit=gtk2)
-	elseif(NOT APPLE)
-		list(APPEND wxWidgets_CONFIG_OPTIONS --toolkit=gtk3)
-	endif()
+		# The wx version must be specified so a mix of gtk2 and gtk3 isn't used
+		# as that can cause compile errors.
+		if(GTK2_API AND NOT APPLE)
+			list(APPEND wxWidgets_CONFIG_OPTIONS --toolkit=gtk2)
+		elseif(NOT APPLE)
+			list(APPEND wxWidgets_CONFIG_OPTIONS --toolkit=gtk3)
+		endif()
 
-	# wx2.8 => /usr/bin/wx-config-2.8
-	# lib32-wx2.8 => /usr/bin/wx-config32-2.8
-	# wx3.0 => /usr/bin/wx-config-3.0
-	# I'm going to take a wild guess and predict this:
-	# lib32-wx3.0 => /usr/bin/wx-config32-3.0
-	# FindwxWidgets only searches for wx-config.
-	if(CMAKE_CROSSCOMPILING)
-		# May need to fix the filenames for lib32-wx3.0.
-		if(${PCSX2_TARGET_ARCHITECTURES} MATCHES "i386")
-			if (Fedora AND EXISTS "/usr/bin/wx-config-3.0")
+		# wx2.8 => /usr/bin/wx-config-2.8
+		# lib32-wx2.8 => /usr/bin/wx-config32-2.8
+		# wx3.0 => /usr/bin/wx-config-3.0
+		# I'm going to take a wild guess and predict this:
+		# lib32-wx3.0 => /usr/bin/wx-config32-3.0
+		# FindwxWidgets only searches for wx-config.
+		if(CMAKE_CROSSCOMPILING)
+			# May need to fix the filenames for lib32-wx3.0.
+			if(${PCSX2_TARGET_ARCHITECTURES} STREQUAL "aarch64")
+				set(wxWidgets_CONFIG_EXECUTABLE "/opt/aarch64-chroot/usr/lib/aarch64-linux-gnu/wx/config/gtk3-unicode-3.0")
+			elseif(${PCSX2_TARGET_ARCHITECTURES} MATCHES "i386")
+				if (Fedora AND EXISTS "/usr/bin/wx-config-3.0")
+					set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config-3.0")
+				endif()
+				if (EXISTS "/usr/bin/wx-config32")
+					set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config32")
+				endif()
+				if (EXISTS "/usr/bin/wx-config32-3.0")
+					set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config32-3.0")
+				endif()
+			endif()
+		else()
+			if (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
+				set(wxWidgets_CONFIG_EXECUTABLE "/usr/local/bin/wxgtk3u-3.0-config")
+			endif()
+			if(EXISTS "/usr/bin/wx-config-3.2")
+				set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config-3.2")
+			endif()
+			if(EXISTS "/usr/bin/wx-config-3.1")
+				set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config-3.1")
+			endif()
+			if(EXISTS "/usr/bin/wx-config-3.0")
 				set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config-3.0")
 			endif()
-			if (EXISTS "/usr/bin/wx-config32")
-				set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config32")
+			if(EXISTS "/usr/bin/wx-config")
+				set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config")
 			endif()
-			if (EXISTS "/usr/bin/wx-config32-3.0")
-				set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config32-3.0")
+			if(NOT GTK2_API AND EXISTS "/usr/bin/wx-config-gtk3")
+				set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config-gtk3")
 			endif()
 		endif()
-	else()
-		if (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
-			set(wxWidgets_CONFIG_EXECUTABLE "/usr/local/bin/wxgtk3u-3.0-config")
-		endif()
-		if(EXISTS "/usr/bin/wx-config-3.2")
-			set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config-3.2")
-		endif()
-		if(EXISTS "/usr/bin/wx-config-3.1")
-			set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config-3.1")
-		endif()
-		if(EXISTS "/usr/bin/wx-config-3.0")
-			set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config-3.0")
-		endif()
-		if(EXISTS "/usr/bin/wx-config")
-			set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config")
-		endif()
-		if(NOT GTK2_API AND EXISTS "/usr/bin/wx-config-gtk3")
-			set(wxWidgets_CONFIG_EXECUTABLE "/usr/bin/wx-config-gtk3")
-		endif()
-	endif()
 
-	find_package(wxWidgets REQUIRED base core adv)
-	include(${wxWidgets_USE_FILE})
-	make_imported_target_if_missing(wxWidgets::all wxWidgets)
+		find_package(wxWidgets REQUIRED base core adv)
+		include(${wxWidgets_USE_FILE})
+		make_imported_target_if_missing(wxWidgets::all wxWidgets)
+	else()
+		# Use bundled minimal wxwidgets.
+		add_subdirectory(3rdparty/wxwidgets3.0 EXCLUDE_FROM_ALL)
+	endif()
 
 	find_package(ZLIB REQUIRED)
 
@@ -163,32 +185,24 @@ else()
 		find_package(X11 REQUIRED)
 		make_imported_target_if_missing(X11::X11 X11)
 	endif()
-	if(APPLE)
-		check_lib(GIO gio-2.0 gio/gio.h)
-	elseif(UNIX)
+	if(UNIX AND NOT PCSX2_CORE)
 		# Most plugins (if not all) and PCSX2 core need gtk2, so set the required flags
 		if (GTK2_API)
 			find_package(GTK2 REQUIRED gtk)
 			alias_library(GTK::gtk GTK2::gtk)
 		else()
-		if(CMAKE_CROSSCOMPILING)
-			find_package(GTK3 REQUIRED gtk)
-			alias_library(GTK::gtk GTK3::gtk)
-		else()
-			check_lib(GTK3 gtk+-3.0 gtk/gtk.h)
-			alias_library(GTK::gtk PkgConfig::GTK3)
-		endif()
+			if(CMAKE_CROSSCOMPILING)
+				find_package(GTK3 REQUIRED gtk)
+				alias_library(GTK::gtk GTK3::gtk)
+			else()
+				check_lib(GTK3 gtk+-3.0 gtk/gtk.h)
+				alias_library(GTK::gtk PkgConfig::GTK3)
+			endif()
 		endif()
 	endif()
 	if(WAYLAND_API)
 		find_package(Wayland REQUIRED)
 	endif()
-
-	#----------------------------------------
-	#           Use system include
-	#----------------------------------------
-	find_package(HarfBuzz)
-
 endif(WIN32)
 
 # Require threads on all OSes.
@@ -260,6 +274,10 @@ if(NOT USE_SYSTEM_YAML)
 	endif()
 endif()
 
+if(QT_BUILD)
+	find_package(Qt5 COMPONENTS Core Gui Widgets Network LinguistTools REQUIRED)
+endif()
+
 add_subdirectory(3rdparty/libchdr/libchdr EXCLUDE_FROM_ALL)
 
 if(USE_NATIVE_TOOLS)
@@ -272,3 +290,15 @@ else()
 endif()
 
 add_subdirectory(3rdparty/glad EXCLUDE_FROM_ALL)
+add_subdirectory(3rdparty/glslang EXCLUDE_FROM_ALL)
+add_subdirectory(3rdparty/imgui EXCLUDE_FROM_ALL)
+add_subdirectory(3rdparty/simpleini EXCLUDE_FROM_ALL)
+add_subdirectory(3rdparty/cpuinfo EXCLUDE_FROM_ALL)
+
+if(CUBEB_API)
+	add_subdirectory(3rdparty/cubeb EXCLUDE_FROM_ALL)
+endif()
+
+if(${PCSX2_TARGET_ARCHITECTURES} STREQUAL "aarch64")
+	add_subdirectory(3rdparty/vixl EXCLUDE_FROM_ALL)
+endif()

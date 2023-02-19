@@ -45,6 +45,8 @@ protected:
     int iFract;
     int iRate;
 
+    virtual void resetRegisters();
+
     virtual int transposeMono(SAMPLETYPE *dest, 
                        const SAMPLETYPE *src, 
                        int &srcSamples);
@@ -58,13 +60,6 @@ public:
     /// Sets new target rate. Normal rate = 1.0, smaller values represent slower 
     /// rate, larger faster rates.
     virtual void setRate(double newRate);
-
-    virtual void resetRegisters();
-
-    int getLatency() const
-    {
-        return 0;
-    }
 };
 
 
@@ -73,6 +68,8 @@ class InterpolateLinearFloat : public TransposerBase
 {
 protected:
     double fract;
+
+    virtual void resetRegisters();
 
     virtual int transposeMono(SAMPLETYPE *dest, 
                        const SAMPLETYPE *src, 
@@ -84,13 +81,6 @@ protected:
 
 public:
     InterpolateLinearFloat();
-
-    virtual void resetRegisters();
-
-    int getLatency() const
-    {
-        return 0;
-    }
 };
 
 }

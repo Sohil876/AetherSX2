@@ -26,7 +26,7 @@
 #define cpuid __cpuid
 #define cpuidex __cpuidex
 
-#else
+#elif !defined(_M_ARM64)
 
 #include <cpuid.h>
 
@@ -44,7 +44,7 @@ static __inline__ __attribute__((always_inline)) void cpuid(int CPUInfo[], const
 
 using namespace x86Emitter;
 
-alignas(16) x86capabilities x86caps;
+__aligned16 x86capabilities x86caps;
 
 x86capabilities::x86capabilities()
 	: isIdentified(false)
@@ -73,6 +73,7 @@ x86capabilities::x86capabilities()
 // Note: recSSE was deleted
 void x86capabilities::SIMD_EstablishMXCSRmask()
 {
+#if defined(_M_X86_32) || defined(_M_X86_64)
 	if (!hasStreamingSIMDExtensions)
 		return;
 
@@ -87,7 +88,7 @@ void x86capabilities::SIMD_EstablishMXCSRmask()
 		MXCSR_Mask.bitmask = 0xFFFF; // SSE2 features added
 	}
 
-	alignas(16) u8 targetFXSAVE[512];
+	__aligned16 u8 targetFXSAVE[512];
 
 	// Work for recent enough GCC/CLANG/MSVC 2012
 	_fxsave(&targetFXSAVE);
@@ -96,6 +97,7 @@ void x86capabilities::SIMD_EstablishMXCSRmask()
 	memcpy(&result, &targetFXSAVE[28], 4); // bytes 28->32 are the MXCSR_Mask.
 	if (result != 0)
 		MXCSR_Mask.bitmask = result;
+#endif
 }
 
 // Counts the number of cpu cycles executed over the requested number of PerformanceCounter
@@ -105,6 +107,7 @@ void x86capabilities::SIMD_EstablishMXCSRmask()
 // by the operating system task switches.
 s64 x86capabilities::_CPUSpeedHz(u64 time) const
 {
+#if defined(_M_X86_32) || defined(_M_X86_64)
 	u64 timeStart, timeStop;
 	s64 startCycle, endCycle;
 
@@ -139,6 +142,9 @@ s64 x86capabilities::_CPUSpeedHz(u64 time) const
 	double newCycleCount = (double)cycleCount - (cyclesPerTick * overrun);
 
 	return (s64)newCycleCount;
+#else
+	return 0;
+#endif
 }
 
 wxString x86capabilities::GetTypeName() const
@@ -161,6 +167,7 @@ wxString x86capabilities::GetTypeName() const
 void x86capabilities::CountCores()
 {
 	Identify();
+#if defined(_M_X86_32) || defined(_M_X86_64)
 
 	s32 regs[4];
 	u32 cmds;
@@ -181,6 +188,7 @@ void x86capabilities::CountCores()
 
 	// This will assign values into LogicalCores and PhysicalCores
 	CountLogicalCores();
+#endif
 }
 
 static const char* tbl_x86vendors[] =
@@ -198,6 +206,7 @@ void x86capabilities::Identify()
 		return;
 	isIdentified = true;
 
+#if defined(_M_X86_32) || defined(_M_X86_64)
 	s32 regs[4];
 	u32 cmds;
 
@@ -319,6 +328,7 @@ void x86capabilities::Identify()
 	hasStreamingSIMD4ExtensionsA = (EFlags2 >> 6) & 1; //INSERTQ / EXTRQ / MOVNT
 
 	isIdentified = true;
+#endif
 }
 
 u32 x86capabilities::CalculateMHz() const

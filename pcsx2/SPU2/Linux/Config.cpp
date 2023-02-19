@@ -18,7 +18,7 @@
 #include "Dialogs.h"
 #include "Config.h"
 
-#if defined(__unix__) || defined(__APPLE__)
+#if !defined(__ANDROID__) && (defined(__unix__) || defined(__APPLE__))
 #include <SDL.h>
 #include <SDL_audio.h>
 #include "SPU2/wx/wxConfig.h"
@@ -130,7 +130,7 @@ void ReadSettings()
 #endif
 #endif
 
-#if defined(__unix__) || defined(__APPLE__)
+#if !defined(__ANDROID__) && (defined(__unix__) || defined(__APPLE__))
 	CfgReadStr(L"SDL", L"HostApi", temp, L"pulseaudio");
 	SdlOutputAPI = 0;
 #if SDL_MAJOR_VERSION >= 2

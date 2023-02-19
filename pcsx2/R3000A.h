@@ -113,9 +113,10 @@ struct psxRegisters {
 	s32 eCycle[32];		// cycle delta for signaled ints (sCycle + eCycle == branch cycle)
 	//u32 _msflag[32];
 	//u32 _smflag[32];
+	u32 pcWriteback;
 };
 
-alignas(16) extern psxRegisters psxRegs;
+extern __aligned16 psxRegisters psxRegs;
 
 extern u32 g_iopNextEventCycle;
 extern s32 iopBreak;		// used when the IOP execution is broken and control returned to the EE

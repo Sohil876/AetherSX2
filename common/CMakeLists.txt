@@ -19,11 +19,14 @@ target_sources(common PRIVATE
 	FastFormatString.cpp
 	FastJmp.cpp
 	GL/Context.cpp
+	GL/Program.cpp
+	GL/ShaderCache.cpp
 	GL/StreamBuffer.cpp
 	FileSystem.cpp
 	IniInterface.cpp
 	Mutex.cpp
 	Misc.cpp
+	MD5Digest.cpp
 	PathUtils.cpp
 	PrecompiledHeader.cpp
 	Perf.cpp
@@ -59,12 +62,12 @@ target_sources(common PRIVATE
 	Linux/LnxMisc.cpp
 	Windows/WinThreads.cpp
 	Windows/WinHostSys.cpp
-	Windows/WinMisc.cpp)
+	Windows/WinMisc.cpp
+	)
 
 # x86emitter headers
 target_sources(common PRIVATE
 	Align.h
-	AlignedMalloc.h
 	Assertions.h
 	boost_spsc_queue.hpp
 	Console.h
@@ -75,9 +78,13 @@ target_sources(common PRIVATE
 	FileSystem.h
 	General.h
 	GL/Context.h
+	GL/Program.h
+	GL/ShaderCache.h
 	GL/StreamBuffer.h
+	HashCombine.h
 	MemcpyFast.h
 	MemsetFast.inl
+	MD5Digest.h
 	Path.h
 	PageFaultSource.h
 	PrecompiledHeader.h
@@ -87,6 +94,7 @@ target_sources(common PRIVATE
 	RedtapeWindows.h
 	RwMutex.h
 	SafeArray.h
+	ScopedAlloc.h
 	ScopedGuard.h
 	ScopedPtrMT.h
 	SettingsInterface.h
@@ -147,6 +155,14 @@ elseif(APPLE)
 	set_source_files_properties(GL/ContextAGL.mm PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 	target_compile_options(common PUBLIC -fobjc-arc)
 	target_link_options(common PUBLIC -fobjc-link-runtime)
+elseif(ANDROID)
+	target_sources(common PRIVATE
+			GL/ContextEGL.cpp
+			GL/ContextEGL.h
+			GL/ContextEGLAndroid.cpp
+			GL/ContextEGLAndroid.h
+			)
+	target_link_libraries(common PRIVATE ${EGL_LIBRARIES})
 else()
 	if(X11_API OR WAYLAND_API)
 		target_sources(common PRIVATE
@@ -161,6 +177,7 @@ else()
 			GL/ContextEGLX11.cpp
 			GL/ContextEGLX11.h
 		)
+		target_compile_definitions(common PUBLIC "VULKAN_USE_X11=1")
 		if(TARGET PkgConfig::XRANDR)
 			target_link_libraries(common PRIVATE PkgConfig::XRANDR)
 			target_compile_definitions(common PRIVATE "HAS_XRANDR=1")
@@ -172,16 +189,12 @@ else()
 			GL/ContextEGLWayland.cpp
 			GL/ContextEGLWayland.h
 		)
-	  target_link_libraries(common PRIVATE ${WAYLAND_EGL_LIBRARIES})
+		target_link_libraries(common PRIVATE ${WAYLAND_EGL_LIBRARIES})
+		target_compile_definitions(common PUBLIC "VULKAN_USE_WAYLAND=1")
 	endif()
 endif()
 
-if (USE_GCC AND CMAKE_INTERPROCEDURAL_OPTIMIZATION)
-	# GCC LTO doesn't work with asm statements
-	set_source_files_properties(FastJmp.cpp PROPERTIES COMPILE_FLAGS -fno-lto)
-endif()
-
-target_link_libraries(common PRIVATE ${LIBC_LIBRARIES} PUBLIC wxWidgets::all glad)
+target_link_libraries(common PRIVATE ${LIBC_LIBRARIES} PUBLIC wxWidgets::all glad glslang)
 target_compile_features(common PUBLIC cxx_std_17)
 target_include_directories(common PUBLIC ../3rdparty/include ../)
 target_compile_definitions(common PUBLIC "${PCSX2_DEFS}")

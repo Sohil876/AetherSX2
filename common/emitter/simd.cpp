@@ -19,23 +19,27 @@
 // Mask of valid bit fields for the target CPU.  Typically this is either 0xFFFF (SSE2
 // or better) or 0xFFBF (SSE1 and earlier).  Code can ensure a safe/valid MXCSR by
 // AND'ing this mask against an MXCSR prior to LDMXCSR.
+#if defined(_M_X86_32) || defined(_M_X86_64)
 SSE_MXCSR MXCSR_Mask;
+#endif
 
-const char* EnumToString(SSE_RoundMode sse)
+const wxChar* EnumToString(SSE_RoundMode sse)
 {
 	switch (sse)
 	{
 		case SSEround_Nearest:
-			return "Nearest";
+			return L"Nearest";
 		case SSEround_NegInf:
-			return "NegativeInfinity";
+			return L"NegativeInfinity";
 		case SSEround_PosInf:
-			return "PositiveInfinity";
+			return L"PositiveInfinity";
 		case SSEround_Chop:
-			return "Chop";
+			return L"Chop";
 		default:
-			return "Invalid";
+			return L"Invalid";
 	}
+
+	return L"Invalid";
 }
 
 SSE_RoundMode SSE_MXCSR::GetRoundMode() const
@@ -72,7 +76,9 @@ SSE_MXCSR& SSE_MXCSR::DisableExceptions()
 // during CPU init/detection.
 SSE_MXCSR& SSE_MXCSR::ApplyReserveMask()
 {
+#if defined(_M_X86_32) || defined(_M_X86_64)
 	bitmask &= MXCSR_Mask.bitmask;
+#endif
 	return *this;
 }
 

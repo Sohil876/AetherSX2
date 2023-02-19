@@ -83,6 +83,13 @@ extern void vtlb_DynV2P();
 extern void vtlb_VMap(u32 vaddr,u32 paddr,u32 sz);
 extern void vtlb_VMapBuffer(u32 vaddr,void* buffer,u32 sz);
 extern void vtlb_VMapUnmap(u32 vaddr,u32 sz);
+extern bool vtlb_ResolveFastmemMapping(uptr* addr);
+extern bool vtlb_GetGuestAddress(uptr host_addr, u32* guest_addr);
+extern void vtlb_UpdateFastmemProtection(uptr base, u32 size, const PageProtectionMode& prot);
+extern bool vtlb_BackpatchLoadStore(uptr code_address, uptr fault_address);
+
+extern void vtlb_AddLoadStoreInfo(uptr code_address, u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 data_register, u8 size_in_bits, bool is_signed, bool is_load, bool is_fpr);
+extern void vtlb_DynBackpatchLoadStore(uptr code_address, u32 guest_addr, u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 data_register, u8 size_in_bits, bool is_signed, bool is_load, bool is_fpr);
 
 //Memory functions
 
@@ -96,6 +103,7 @@ extern void __fastcall vtlb_memWrite(u32 mem, DataType value);
 extern void __fastcall vtlb_memWrite64(u32 mem, const mem64_t* value);
 extern void __fastcall vtlb_memWrite128(u32 mem, const mem128_t* value);
 
+#ifndef _M_ARM64
 extern void vtlb_DynGenWrite(u32 sz);
 extern void vtlb_DynGenRead32(u32 bits, bool sign);
 extern int  vtlb_DynGenRead64(u32 sz, int gpr);
@@ -103,6 +111,19 @@ extern int  vtlb_DynGenRead64(u32 sz, int gpr);
 extern void vtlb_DynGenWrite_Const( u32 bits, u32 addr_const );
 extern int  vtlb_DynGenRead64_Const( u32 bits, u32 addr_const, int gpr );
 extern void vtlb_DynGenRead32_Const( u32 bits, bool sign, u32 addr_const );
+#else
+extern void vtlb_DynGenReadNonQuad(int destreg, bool is_fpr, u32 bits, bool sign);
+extern void vtlb_DynGenWriteNonQuad(int srcreg, bool is_fpr, u32 sz);
+extern void vtlb_DynGenReadQuad(int destreg, u32 sz);
+extern void vtlb_DynGenWriteQuad(int srcreg, u32 sz);
+
+extern void vtlb_DynGenReadNonQuad_Const(int destreg, bool is_fpr, u32 bits, bool sign, u32 addr_const);
+extern void vtlb_DynGenWriteNonQuad_Const(int srcreg, bool is_fpr, u32 bits, u32 addr_const);
+extern void vtlb_DynGenReadQuad_Const(int destreg, u32 bits, u32 addr_const);
+extern void vtlb_DynGenWriteQuad_Const(int srcreg, u32 bits, u32 addr_const);
+
+extern void vtlb_DynGenDispatchers();
+#endif
 
 // --------------------------------------------------------------------------------------
 //  VtlbMemoryReserve
@@ -253,14 +274,17 @@ namespace vtlb_private
 
 		u32* ppmap;               //4MB (allocated by vtlb_init) // PS2 virtual to PS2 physical
 
+		uptr fastmem_base;
+
 		MapData()
 		{
 			vmap = NULL;
 			ppmap = NULL;
+			fastmem_base = 0;
 		}
 	};
 
-	alignas(64) extern MapData vtlbdata;
+	extern __aligned(64) MapData vtlbdata;
 
 	inline void *VTLBVirtual::assumeHandlerGetRaw(int index, bool write) const
 	{

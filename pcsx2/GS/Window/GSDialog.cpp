@@ -16,7 +16,6 @@
 #include "PrecompiledHeader.h"
 #include <Shlwapi.h>
 #include <CommCtrl.h>
-#include <commdlg.h>
 #include "GS.h"
 #include "GSDialog.h"
 #include "GS/GSVector.h"

@@ -59,6 +59,8 @@ public:
     };
 
 protected:
+    virtual void resetRegisters() = 0;
+
     virtual int transposeMono(SAMPLETYPE *dest, 
                         const SAMPLETYPE *src, 
                         int &srcSamples)  = 0;
@@ -81,9 +83,6 @@ public:
     virtual int transpose(FIFOSampleBuffer &dest, FIFOSampleBuffer &src);
     virtual void setRate(double newRate);
     virtual void setChannels(int channels);
-    virtual int getLatency() const = 0;
-
-    virtual void resetRegisters() = 0;
 
     // static factory function
     static TransposerBase *newInstance();

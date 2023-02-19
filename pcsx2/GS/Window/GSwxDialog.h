@@ -100,6 +100,7 @@ public:
 
 namespace GSSettingsDialog
 {
+
 	class RendererTab : public wxPanel
 	{
 	public:
@@ -110,8 +111,6 @@ namespace GSSettingsDialog
 		std::pair<wxChoice*, wxStaticText*> m_blend_mode_d3d11;
 #endif
 		bool m_is_hardware = false;
-		bool m_is_native_res = false;
-		bool m_is_nearest_filter = false;
 
 		RendererTab(wxWindow* parent);
 		void Load() { m_ui.Load(); }
@@ -125,9 +124,7 @@ namespace GSSettingsDialog
 	public:
 		GSUIElementHolder m_ui;
 		wxSpinCtrl *skip_x_spin, *skip_y_spin;
-		bool m_is_hardware = false;
 		bool m_is_native_res = false;
-		bool m_is_ogl_hw = false;
 
 		HacksTab(wxWindow* parent);
 		void Load() { m_ui.Load(); }
@@ -139,6 +136,8 @@ namespace GSSettingsDialog
 	{
 	public:
 		GSUIElementHolder m_ui;
+		wxSpinCtrl* start_dump_spin = nullptr;
+		wxSpinCtrl* end_dump_spin = nullptr;
 		bool m_is_ogl_hw = false;
 
 		DebugTab(wxWindow* parent);
@@ -189,7 +188,6 @@ namespace GSSettingsDialog
 #ifdef _WIN32
 		wxChoice* m_adapter_select;
 #endif
-		wxChoice* m_bifilter_select;
 		wxArrayString m_adapter_arr_string;
 		RendererTab* m_renderer_panel;
 		HacksTab* m_hacks_panel;

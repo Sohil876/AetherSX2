@@ -27,6 +27,7 @@
 #include "R5900OpcodeTables.h"
 
 #include <time.h>
+#include <zlib.h>
 
 #ifndef _WIN32
 #include <sys/types.h>
@@ -105,7 +106,7 @@ static u32 psxdump = 0;
 static void __fastcall iopRecRecompile(const u32 startpc);
 
 // Recompiled code buffer for EE recompiler dispatchers!
-alignas(__pagesize) static u8 iopRecDispatchers[__pagesize];
+static u8 __pagealigned iopRecDispatchers[__pagesize];
 
 typedef void DynGenFunc();
 
@@ -246,7 +247,7 @@ static void iIopDumpBlock(int startpc, u8* ptr)
 
 	memzero(used);
 	numused = 0;
-	for (i = 0; i < std::size(s_pInstCache->regs); ++i)
+	for (i = 0; i < ArraySize(s_pInstCache->regs); ++i)
 	{
 		if (s_pInstCache->regs[i] & EEINST_USED)
 		{
@@ -256,7 +257,7 @@ static void iIopDumpBlock(int startpc, u8* ptr)
 	}
 
 	f.Printf("       ");
-	for (i = 0; i < std::size(s_pInstCache->regs); ++i)
+	for (i = 0; i < ArraySize(s_pInstCache->regs); ++i)
 	{
 		if (used[i])
 			f.Printf("%2d ", i);
@@ -264,7 +265,7 @@ static void iIopDumpBlock(int startpc, u8* ptr)
 	f.Printf("\n");
 
 	f.Printf("       ");
-	for (i = 0; i < std::size(s_pInstCache->regs); ++i)
+	for (i = 0; i < ArraySize(s_pInstCache->regs); ++i)
 	{
 		if (used[i])
 			f.Printf("%s ", disRNameGPR[i]);
@@ -277,7 +278,7 @@ static void iIopDumpBlock(int startpc, u8* ptr)
 		f.Printf("%2d: %2.2x ", i + 1, pcur->info);
 
 		count = 1;
-		for (j = 0; j < std::size(s_pInstCache->regs); j++)
+		for (j = 0; j < ArraySize(s_pInstCache->regs); j++)
 		{
 			if (used[j])
 			{
@@ -572,7 +573,7 @@ static void psxRecompileIrxImport()
 	xMOV(ptr32[&psxRegs.pc], psxpc);
 	_psxFlushCall(FLUSH_NODESTROY);
 
-	if (SysTraceActive(IOP.Bios))
+	/*if (SysTraceActive(IOP.Bios))
 	{
 		#ifdef __M_X86_64
 			xMOV64(arg3reg, (uptr)funcname);
@@ -581,7 +582,7 @@ static void psxRecompileIrxImport()
 		#endif
 
 		xFastCall((void*)irxImportLog_rec, import_table, index);
-	}
+	}*/
 
 	if (debug)
 		xFastCall((void*)debug);
@@ -690,7 +691,7 @@ static void recReserveCache()
 
 	while (!recMem->IsOk())
 	{
-		if (recMem->Reserve(GetVmMemory().MainMemory(), HostMemoryMap::IOPrecOffset, m_ConfiguredCacheReserve * _1mb) != NULL)
+		if (recMem->Reserve(GetVmMemory().CodeMemory(), HostMemoryMap::IOPrecOffset, m_ConfiguredCacheReserve * _1mb) != NULL)
 			break;
 
 		// If it failed, then try again (if possible):
@@ -1127,7 +1128,9 @@ void psxDynarecCheckBreakpoint()
 		return;
 
 	CBreakPoints::SetBreakpointTriggered(true);
+#ifndef PCSX2_CORE
 	GetCoreThread().PauseSelfDebug();
+#endif
 	iopBreakpoint = true;
 }
 
@@ -1138,7 +1141,9 @@ void psxDynarecMemcheck()
 		return;
 
 	CBreakPoints::SetBreakpointTriggered(true);
+#ifndef PCSX2_CORE
 	GetCoreThread().PauseSelfDebug();
+#endif
 	iopBreakpoint = true;
 }
 
@@ -1275,7 +1280,7 @@ void psxRecompileNextInstruction(int delayslot)
 
 static void __fastcall PreBlockCheck(u32 blockpc)
 {
-#ifdef PCSX2_DEBUG
+#ifdef PCSX2_DEBUGA
 	extern void iDumpPsxRegisters(u32 startpc, u32 temp);
 
 	static u32 lastrec = 0;
@@ -1296,6 +1301,36 @@ static void __fastcall PreBlockCheck(u32 blockpc)
 
 		lastrec = blockpc;
 	}
+#endif
+
+#if 0
+	static FILE* fp = nullptr;
+	static bool fp_opened = false;
+	if (!fp_opened && psxRegs.cycle >= 346386724)
+	{
+		fp = std::fopen("ioplog.txt", "wb");
+		fp_opened = true;
+	}
+	if (fp)
+	{
+		u32 hash = crc32(0, (Bytef*)&psxRegs, offsetof(psxRegisters, pc));
+
+#if 0
+			std::fprintf(fp, "%08X (%u; %08X):", psxRegs.pc, psxRegs.cycle, hash);
+			for (int i = 0; i < 34; i++)
+			{
+				std::fprintf(fp, " %s: %08X", R3000A::disRNameGPR[i], psxRegs.GPR.r[i]);
+			}
+			std::fprintf(fp, "\n");
+#else
+		std::fprintf(fp, "%08X (%u): %08X\n", psxRegs.pc, psxRegs.cycle, hash);
+#endif
+		// std::fflush(fp);
+	}
+#endif
+#if 0
+		if (psxRegs.cycle == 346386724)
+			__debugbreak();
 #endif
 }
 
@@ -1475,9 +1510,9 @@ StartRecomp:
 	// dump code
 	if (IsDebugBuild)
 	{
-		for (u32 recblock : s_psxrecblocks)
+		for (i = 0; i < ArraySize(s_psxrecblocks); ++i)
 		{
-			if (startpc == recblock)
+			if (startpc == s_psxrecblocks[i])
 			{
 				iIopDumpBlock(startpc, recPtr);
 			}

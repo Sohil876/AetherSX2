@@ -28,7 +28,7 @@ class GSCapture
 	std::recursive_mutex m_lock;
 	bool m_capturing;
 	GSVector2i m_size;
-	u64 m_frame;
+	uint64 m_frame;
 	std::string m_out_dir;
 	int m_threads;
 

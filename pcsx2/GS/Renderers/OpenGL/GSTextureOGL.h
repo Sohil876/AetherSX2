@@ -16,8 +16,7 @@
 #pragma once
 
 #include "GS/Renderers/Common/GSTexture.h"
-#include "GS/GSGL.h"
-#include "common/AlignedMalloc.h"
+#include "GS.h"
 
 namespace PboPool
 {
@@ -25,7 +24,7 @@ namespace PboPool
 	inline void UnbindPbo();
 	inline void Sync();
 
-	inline char* Map(u32 size);
+	inline char* Map(uint32 size);
 	inline void Unmap();
 	inline uptr Offset();
 	inline void EndTransfer();
@@ -42,6 +41,7 @@ private:
 	bool m_clean;
 	bool m_generate_mipmap;
 
+	uint8* m_local_buffer;
 	// Avoid alignment constrain
 	//GSVector4i m_r;
 	int m_r_x;
@@ -54,14 +54,16 @@ private:
 	// internal opengl format/type/alignment
 	GLenum m_int_format;
 	GLenum m_int_type;
-	u32 m_int_shift;
+	uint32 m_int_shift;
 
 	// Allow to track size of allocated memory
-	u32 m_mem_usage;
+	uint32 m_mem_usage;
 
 public:
-	explicit GSTextureOGL(Type type, int w, int h, Format format, GLuint fbo_read, bool mipmap);
+	explicit GSTextureOGL(int type, int w, int h, int format, GLuint fbo_read, bool mipmap);
 	virtual ~GSTextureOGL();
+
+	void* GetNativeHandle() const override;
 
 	bool Update(const GSVector4i& r, const void* data, int pitch, int layer = 0) final;
 	bool Map(GSMap& m, const GSVector4i* r = NULL, int layer = 0) final;
@@ -69,11 +71,10 @@ public:
 	void GenerateMipmap() final;
 	bool Save(const std::string& fn) final;
 
-	GSMap Read(const GSVector4i& r, AlignedBuffer<u8, 32>& buffer);
-	bool IsBackbuffer() { return (m_type == Type::Backbuffer); }
-	bool IsDss() { return (m_type == Type::DepthStencil || m_type == Type::SparseDepthStencil); }
+	bool IsDss() { return (m_type == GSTexture::DepthStencil || m_type == GSTexture::SparseDepthStencil) && (m_format == GL_DEPTH32F_STENCIL8); }
+	bool IsDepth() { return (m_type == GSTexture::DepthStencil || m_type == GSTexture::SparseDepthStencil); }
 
-	u32 GetID() final { return m_texture_id; }
+	uint32 GetID() final { return m_texture_id; }
 	bool HasBeenCleaned() { return m_clean; }
 	void WasAttached() { m_clean = false; }
 	void WasCleaned() { m_clean = true; }
@@ -83,5 +84,5 @@ public:
 
 	void CommitPages(const GSVector2i& region, bool commit) final;
 
-	u32 GetMemUsage();
+	uint32 GetMemUsage() final;
 };

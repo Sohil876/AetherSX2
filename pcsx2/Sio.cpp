@@ -19,11 +19,19 @@
 #include "Common.h"
 #include "Sio.h"
 #include "sio_internal.h"
-#include "PAD/Gamepad.h"
+#if defined(PCSX2_CORE)
+#include "PAD/Host/PAD.h"
+#elif defined(_WIN32)
+#include "PAD/Windows/PAD.h"
+#else
+#include "PAD/Linux/PAD.h"
+#endif
 
 #ifndef DISABLE_RECORDING
 #	include "Recording/InputRecording.h"
 #endif
+
+// #define DISABLE_PAD 1
 
 _sio sio;
 _mcd mcds[2][4];
@@ -205,11 +213,20 @@ SIO_WRITE sioWriteController(u8 data)
 		byteCnt = 0; //hope this gets only cleared on the first byte...
 		SIO_STAT_READY();
 		DEVICE_PLUGGED();
+#ifdef DISABLE_PAD
+		sio.buf[0] = 0;
+#else
 		sio.buf[0] = PADstartPoll(sio.port + 1);
+#endif
 		break;
 
 	default:
+#ifdef DISABLE_PAD
+		sio.buf[sio.bufCount] = 0;
+#else
 		sio.buf[sio.bufCount] = PADpoll(data);
+#endif
+
 #ifndef DISABLE_RECORDING
 		if (g_Conf->EmuOptions.EnableRecordingTools)
 		{

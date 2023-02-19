@@ -64,7 +64,7 @@ class GSRendererSW : public GSRenderer
 
 	ConvertVertexBufferPtr m_cvb[4][2][2][2];
 
-	template <u32 primclass, u32 tme, u32 fst, u32 q_div>
+	template <uint32 primclass, uint32 tme, uint32 fst, uint32 q_div>
 	void ConvertVertexBuffer(GSVertexSW* RESTRICT dst, const GSVertex* RESTRICT src, size_t count);
 
 protected:
@@ -72,24 +72,24 @@ protected:
 	GSRingHeap m_vertex_heap;
 	GSTextureCacheSW* m_tc;
 	GSTexture* m_texture[2];
-	u8* m_output;
+	uint8* m_output;
 	GSPixelOffset4* m_fzb;
 	GSVector4i m_fzb_bbox;
-	u32 m_fzb_cur_pages[16];
-	std::atomic<u32> m_fzb_pages[512]; // u16 frame/zbuf pages interleaved
-	std::atomic<u16> m_tex_pages[512];
+	uint32 m_fzb_cur_pages[16];
+	std::atomic<uint32> m_fzb_pages[512]; // uint16 frame/zbuf pages interleaved
+	std::atomic<uint16> m_tex_pages[512];
 
-	void Reset();
-	void VSync(int field);
+	void Reset() final;
+	void VSync(int field) final;
 	void ResetDevice();
-	GSTexture* GetOutput(int i, int& y_offset);
-	GSTexture* GetFeedbackOutput();
+	GSTexture* GetOutput(int i, int& y_offset) final;
+	GSTexture* GetFeedbackOutput() final;
 
-	void Draw();
+	void Draw() final;
 	void Queue(GSRingHeap::SharedPtr<GSRasterizerData>& item);
 	void Sync(int reason);
-	void InvalidateVideoMem(const GIFRegBITBLTBUF& BITBLTBUF, const GSVector4i& r);
-	void InvalidateLocalMem(const GIFRegBITBLTBUF& BITBLTBUF, const GSVector4i& r, bool clut = false);
+	void InvalidateVideoMem(const GIFRegBITBLTBUF& BITBLTBUF, const GSVector4i& r) final;
+	void InvalidateLocalMem(const GIFRegBITBLTBUF& BITBLTBUF, const GSVector4i& r, bool clut = false) final;
 
 	void UsePages(const GSOffset::PageLooper& pages, const int type);
 	void ReleasePages(const GSOffset::PageLooper& pages, const int type);
@@ -100,6 +100,8 @@ protected:
 	bool GetScanlineGlobalData(SharedData* data);
 
 public:
-	GSRendererSW(int threads);
+	GSRendererSW(std::unique_ptr<GSDevice> dev, int threads);
 	virtual ~GSRendererSW();
+
+	const char* GetName() const override;
 };

@@ -67,7 +67,7 @@
 // unchanged for long periods of time, or happen to be used by almost everything, so they
 // need a full recompile anyway, when modified (etc)
 
-#include "PCSX2Base.h"
+#include "common/Pcsx2Defs.h"
 #include "gui/i18n.h"
 
 #include "common/wxBaseTools.h"
@@ -75,7 +75,10 @@
 #include "common/Console.h"
 #include "common/MemcpyFast.h"
 #include "common/General.h"
+
+#if defined(_M_X86_32) || defined(_M_X86_64)
 #include "common/emitter/tools.h"
+#endif
 
 #include "Config.h"
 

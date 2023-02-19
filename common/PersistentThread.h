@@ -61,6 +61,8 @@ namespace Threading
 	/// Set the name of the current thread
 	void SetNameOfCurrentThread(const char* name);
 
+	void SetAffinityForCurrentThread(u64 processor_mask);
+
 	// --------------------------------------------------------------------------------------
 	// pxThread - Helper class for the basics of starting/managing persistent threads.
 	// --------------------------------------------------------------------------------------
@@ -115,6 +117,8 @@ namespace Threading
 
 		EventSource<EventListener_Thread> m_evtsrc_OnDelete;
 
+		u32 m_stack_size = 0;
+
 
 	public:
 		virtual ~pxThread();
@@ -150,6 +154,8 @@ namespace Threading
 
 		wxString GetName() const;
 		void SetName(const wxString& newname);
+
+		void SetAffinity(u64 processor_mask);
 
 	protected:
 		// Extending classes should always implement your own OnStart(), which is called by

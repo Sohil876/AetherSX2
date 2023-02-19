@@ -23,11 +23,19 @@ static long DoSysPageFaultExceptionFilter(EXCEPTION_POINTERS* eps)
 	if (eps->ExceptionRecord->ExceptionCode != EXCEPTION_ACCESS_VIOLATION)
 		return EXCEPTION_CONTINUE_SEARCH;
 
+#if defined(_M_AMD64)
+	void* const exception_pc = reinterpret_cast<void*>(eps->ContextRecord->Rip);
+#elif defined(_M_ARM64)
+	void* const exception_pc = reinterpret_cast<void*>(eps->ContextRecord->Pc);
+#else
+	void* const exception_pc = nullptr;
+#endif
+
 	// Note: This exception can be accessed by the EE or MTVU thread
 	// Source_PageFault is a global variable with its own state information
 	// so for now we lock this exception code unless someone can fix this better...
 	Threading::ScopedLock lock(PageFault_Mutex);
-	Source_PageFault->Dispatch(PageFaultInfo((uptr)eps->ExceptionRecord->ExceptionInformation[1]));
+	Source_PageFault->Dispatch(PageFaultInfo((uptr)exception_pc, (uptr)eps->ExceptionRecord->ExceptionInformation[1]));
 	return Source_PageFault->WasHandled() ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_CONTINUE_SEARCH;
 }
 
@@ -77,16 +85,11 @@ static DWORD ConvertToWinApi(const PageProtectionMode& mode)
 	return winmode;
 }
 
-void* HostSys::MmapReservePtr(void* base, size_t size)
+void* HostSys::MmapAllocatePtr(void* base, size_t size, const PageProtectionMode& mode)
 {
-	return VirtualAlloc(base, size, MEM_RESERVE, PAGE_NOACCESS);
-}
-
-bool HostSys::MmapCommitPtr(void* base, size_t size, const PageProtectionMode& mode)
-{
-	void* result = VirtualAlloc(base, size, MEM_COMMIT, ConvertToWinApi(mode));
+	void* result = VirtualAlloc(base, size, MEM_RESERVE | MEM_COMMIT, ConvertToWinApi(mode));
 	if (result)
-		return true;
+		return result;
 
 	const DWORD errcode = GetLastError();
 	if (errcode == ERROR_COMMITMENT_MINIMUM)
@@ -94,7 +97,7 @@ bool HostSys::MmapCommitPtr(void* base, size_t size, const PageProtectionMode& m
 		Console.Warning("(MmapCommit) Received windows error %u {Virtual Memory Minimum Too Low}.", ERROR_COMMITMENT_MINIMUM);
 		Sleep(1000); // Cut windows some time to rework its memory...
 	}
-	else if (errcode != ERROR_NOT_ENOUGH_MEMORY && errcode != ERROR_OUTOFMEMORY)
+	else if (errcode != ERROR_NOT_ENOUGH_MEMORY && errcode != ERROR_OUTOFMEMORY && errcode != ERROR_INVALID_ADDRESS)
 	{
 		pxFailDev(L"VirtualAlloc COMMIT failed: " + Exception::WinApiError().GetMsgFromWindows());
 		return false;
@@ -103,30 +106,13 @@ bool HostSys::MmapCommitPtr(void* base, size_t size, const PageProtectionMode& m
 	if (!pxDoOutOfMemory)
 		return false;
 	pxDoOutOfMemory(size);
-	return VirtualAlloc(base, size, MEM_COMMIT, ConvertToWinApi(mode)) != NULL;
+	return VirtualAlloc(base, size, MEM_RESERVE | MEM_COMMIT, ConvertToWinApi(mode));
 }
 
-void HostSys::MmapResetPtr(void* base, size_t size)
+void* HostSys::MmapAllocate(uptr base, size_t size, const PageProtectionMode& mode)
 {
-	VirtualFree(base, size, MEM_DECOMMIT);
+	return MmapAllocatePtr((void*)base, size, mode);
 }
-
-
-void* HostSys::MmapReserve(uptr base, size_t size)
-{
-	return MmapReservePtr((void*)base, size);
-}
-
-bool HostSys::MmapCommit(uptr base, size_t size, const PageProtectionMode& mode)
-{
-	return MmapCommitPtr((void*)base, size, mode);
-}
-
-void HostSys::MmapReset(uptr base, size_t size)
-{
-	MmapResetPtr((void*)base, size);
-}
-
 
 void* HostSys::Mmap(uptr base, size_t size)
 {
@@ -160,4 +146,65 @@ void HostSys::MemProtect(void* baseaddr, size_t size, const PageProtectionMode& 
 		pxFailDev(apiError.FormatDiagnosticMessage());
 	}
 }
+
+wxString HostSys::GetFileMappingName(const char* prefix)
+{
+	const unsigned pid = GetCurrentProcessId();
+
+	FastFormatAscii ret;
+	ret.Write("pcsx2_%u", prefix, pid);
+	return ret.GetString();
+}
+
+void* HostSys::CreateSharedMemory(const wxString& name, size_t size)
+{
+#ifndef _M_ARM64
+	const DWORD access = PAGE_EXECUTE_READWRITE;
+#else
+	const DWORD access = PAGE_READWRITE;
+#endif
+	return static_cast<void*>(CreateFileMappingW(INVALID_HANDLE_VALUE, NULL, access, static_cast<DWORD>(size >> 32), static_cast<DWORD>(size), name.c_str()));
+}
+
+void HostSys::DestroySharedMemory(void* ptr)
+{
+	CloseHandle(static_cast<HANDLE>(ptr));
+}
+
+void* HostSys::ReserveSharedMemoryArea(size_t size)
+{
+	void* base_address = VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_NOACCESS);
+	if (!base_address)
+		pxFailRel("Failed to reserve fastmem area");
+
+	return base_address;
+}
+
+void* HostSys::MapSharedMemory(void* handle, size_t offset, void* baseaddr, size_t size, const PageProtectionMode& mode)
+{
+#ifndef _M_ARM64
+	const DWORD access = FILE_MAP_READ | FILE_MAP_WRITE | FILE_MAP_EXECUTE;
+#else
+	const DWORD access = FILE_MAP_READ | FILE_MAP_WRITE;
+#endif
+	DWORD prot = ConvertToWinApi(mode);
+	void* ret = MapViewOfFileEx(static_cast<HANDLE>(handle), access, static_cast<DWORD>(offset >> 32), static_cast<DWORD>(offset), size, baseaddr);
+	if (!ret)
+		return nullptr;
+
+	if (prot != PAGE_EXECUTE_READWRITE)
+	{
+		DWORD old_prot;
+		if (!VirtualProtect(ret, size, prot, &old_prot))
+			pxFail("Failed to protect memory mapping");
+	}
+	return ret;
+}
+
+void HostSys::UnmapSharedMemory(void* handle, void* baseaddr, size_t size)
+{
+	if (!UnmapViewOfFile(baseaddr))
+		pxFail("Failed to unmap shared memory");
+}
+
 #endif

@@ -9,6 +9,7 @@
     <SSEString Condition="$(Configuration.Contains(AVX2))">-avx2</SSEString>
     <ArchString />
     <ArchString Condition="'$(Platform)'=='x64'">x64</ArchString>
+    <ArchString Condition="'$(Platform)'=='ARM64'">arm64</ArchString>
     <BuildString />
     <BuildString Condition="$(Configuration.Contains(Debug))">-dbg</BuildString>
     <BuildString Condition="$(Configuration.Contains(Devel))">-dev</BuildString>
@@ -21,7 +22,8 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>./;$(ProjectDir);$(ProjectDir)x86;$(ProjectDir)x86\ix86-32;$(ProjectDir)IPU;$(ProjectDir)System;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_M_X86;__i386__;TIXML_USE_STL;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>TIXML_USE_STL;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Platform)'!='ARM64'">_M_X86;__i386__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <PrecompiledHeaderOutputFile>$(IntDir)pcsx2.pch</PrecompiledHeaderOutputFile>
       <CompileAs>Default</CompileAs>

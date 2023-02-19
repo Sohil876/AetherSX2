@@ -17,24 +17,24 @@
 
 #include "GS/Renderers/Common/GSTexture.h"
 
-class GSTextureNull : public GSTexture
+class GSTextureNull final : public GSTexture
 {
 	struct
 	{
-		Type type;
-		Format format;
-		int w, h;
+		int type, w, h, format;
 	} m_desc;
 
 public:
 	GSTextureNull();
-	GSTextureNull(Type type, int w, int h, Format format);
+	GSTextureNull(int type, int w, int h, int format);
 
-	Type GetType() const { return m_desc.type; }
-	Format GetFormat() const { return m_desc.format; }
+	void* GetNativeHandle() const final;
 
-	bool Update(const GSVector4i& r, const void* data, int pitch, int layer = 0) { return true; }
-	bool Map(GSMap& m, const GSVector4i* r = NULL, int layer = 0) { return false; }
-	void Unmap() {}
-	bool Save(const std::string& fn) { return false; }
+	int GetType() const { return m_desc.type; }
+	int GetFormat() const { return m_desc.format; }
+
+	bool Update(const GSVector4i& r, const void* data, int pitch, int layer = 0) final { return true; }
+	bool Map(GSMap& m, const GSVector4i* r = NULL, int layer = 0) final { return false; }
+	void Unmap() final {}
+	bool Save(const std::string& fn) final { return false; }
 };

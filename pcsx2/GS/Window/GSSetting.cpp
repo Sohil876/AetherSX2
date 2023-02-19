@@ -85,8 +85,6 @@ const char* dialog_message(int ID, bool* updateText)
 				"  0500 0500, fixes Persona 3 minimap, helps Haunting Ground.");
 		case IDC_OSD_LOG:
 			return cvtString("Prints log messages from the Function keys onscreen.");
-		case IDC_OSD_MONITOR:
-			return cvtString("Continuously prints/overlays the FPS counter and the EE ('CPU-usage') ,\nGS ('GPU-usage') and VU(if the MTVU speedhack is enabled) percentages onscreen.");
 		case IDC_PALTEX:
 			return cvtString("Enabled: GPU converts colormap-textures.\n"
 				"Disabled: CPU converts colormap-textures.\n\n"
@@ -97,13 +95,13 @@ const char* dialog_message(int ID, bool* updateText)
 				"Note: Direct3D 11 is less accurate.");
 		case IDC_ACCURATE_BLEND_UNIT:
 			return cvtString("Control the accuracy level of the GS blending unit emulation.\n\n"
-				"Minimum:\nFast but introduces various rendering issues.\n"
+				"None:\nFast but introduces various rendering issues.\n"
 				"It is intended for slow computer.\n\n"
 				"Basic:\nEmulate correctly most of the effects with a limited speed penalty.\n"
 				"This is the recommended setting.\n\n"
 				"Medium:\nExtend it to all sprites. Performance impact remains reasonable in 3D game.\n\n"
 				"High:\nExtend it to destination alpha blending and color wrapping (helps shadow and fog effects).\n"
-				"A good CPU is required.\n\n"
+				"A good GPU is required.\n\n"
 				"Full:\nExcept few cases, the blending unit will be fully emulated by the shader. It is ultra slow!\n"
 				"It is intended for debug.\n\n"
 				"Ultra:\nThe blending unit will be completely emulated by the shader. It is ultra slow!\n"
@@ -167,10 +165,6 @@ const char* dialog_message(int ID, bool* updateText)
 		case IDC_SPARSE_TEXTURE:
 			return cvtString("Allows to reduce VRAM usage on the GPU.\n\n"
 				"Note: Feature is currently experimental and works only on Nvidia GPUs.");
-		case IDC_OSD_MAX_LOG_EDIT:
-		case IDC_OSD_MAX_LOG:
-			return cvtString("Sets the maximum number of log messages on the screen or in the buffer at the same time.\n\n"
-				"The maximum number of messages visible on the screen at the same time also depends on the character size.");
 		case IDC_LINEAR_PRESENT:
 			return cvtString("Use bilinear filtering when Upscaling/Downscaling the image to the screen. Disable it if you want a sharper/pixelated output.");
 		// Exclusive for Hardware Renderer
@@ -204,7 +198,7 @@ const char* dialog_message(int ID, bool* updateText)
 #ifdef _WIN32
 		case IDC_ACCURATE_BLEND_UNIT_D3D11:
 			return L"Control the accuracy level of the GS blending unit emulation.\n\n"
-				"Minimum:\nFast but introduces various rendering issues.\n"
+				"None:\nFast but introduces various rendering issues.\n"
 				"It is intended for slow computer.\n\n"
 				"Basic:\nEmulate correctly some of the effects with a limited speed penalty.\n"
 				"This is the recommended setting.\n\n"

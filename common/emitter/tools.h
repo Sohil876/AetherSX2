@@ -208,5 +208,95 @@ union SSE_MXCSR
 
 extern SSE_MXCSR MXCSR_Mask;
 
+#if defined(_M_ARM64)
 
-alignas(16) extern x86capabilities x86caps;
+union AARCH64_FPCR
+{
+	u64 bitmask;
+
+  struct
+	{
+		u64
+			FIZ : 1, // DenormalsAreZero
+			AH : 1, // not supported on most chips
+			NEP : 1,
+			unused1 : 4,
+			RES0 : 1,
+			IOE : 1,    // InvalidOpFlag
+			DZE : 1,    // DivideByZeroFlag
+			OFE : 1,    // OverflowFlag
+			UFE : 1,    // UnderflowFlag
+			IXE : 1,    // PrecisionFlag
+			Len_ : 2,
+			DN : 1, // DenormalFlag
+			unused3 : 3,
+			FZ16 : 1,
+			Stride : 2,
+			RMode : 2, //RoundingControl
+			FZ : 1;   // FlushToZero
+	};
+};
+
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
+
+static inline void a64_setfpcr(u64 new_value)
+{
+#ifndef _MSC_VER
+  asm volatile("msr FPCR, %0" ::"r"(new_value));
+#else
+  _WriteStatusReg(0x5A20, new_value);
+#endif
+}
+
+static inline u64 a64_getfpcr()
+{
+#ifndef _MSC_VER
+  u64 value;
+  asm volatile("mrs %0, FPCR" : "=r"(value));
+  return value;
+#else
+  return _ReadStatusReg(0x5A20);
+#endif
+}
+
+static inline u64 MXCSRToFPCR(u32 mxcsr_bits)
+{
+	const SSE_MXCSR sse_val{mxcsr_bits};
+  AARCH64_FPCR a64_val{ a64_getfpcr() };
+
+  a64_val.FIZ = sse_val.DenormalsAreZero;
+  a64_val.AH = 0;
+  a64_val.IOE = sse_val.InvalidOpFlag;
+  a64_val.DZE = sse_val.DivideByZeroFlag;
+  a64_val.OFE = sse_val.OverflowFlag;
+  a64_val.UFE = sse_val.UnderflowFlag;
+  a64_val.IXE = sse_val.PrecisionFlag;
+  a64_val.DN = sse_val.DenormalFlag;
+  a64_val.FZ16 = sse_val.FlushToZero;   // is this needed? probably not.
+  a64_val.FZ = sse_val.FlushToZero;
+
+  switch (sse_val.RoundingControl)
+  {
+  case SSEround_NegInf:
+    a64_val.RMode = 0b10;
+    break;
+  case SSEround_PosInf:
+    a64_val.RMode = 0b01;
+    break;
+  case SSEround_Chop:
+    a64_val.RMode = 0b11;
+    break;
+  case SSEround_Nearest:
+  default:
+    a64_val.RMode = 0b00;
+    break;
+  }
+
+  return a64_val.bitmask;
+}
+
+#endif
+
+extern __aligned16 x86capabilities x86caps;

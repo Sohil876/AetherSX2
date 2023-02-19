@@ -14,6 +14,7 @@
  */
 
 #include "PrecompiledHeader.h"
+#include "GS/GS_types.h"
 #include "GSSetupPrimCodeGenerator.all.h"
 #include "GSVertexSW.h"
 
@@ -47,7 +48,7 @@ using namespace Xbyak;
 	#define _rip_local_d_p(x) _rip_local_d(x)
 #endif
 
-GSSetupPrimCodeGenerator2::GSSetupPrimCodeGenerator2(Xbyak::CodeGenerator* base, CPUInfo cpu, void* param, u64 key)
+GSSetupPrimCodeGenerator2::GSSetupPrimCodeGenerator2(Xbyak::CodeGenerator* base, CPUInfo cpu, void* param, uint64 key)
 	: _parent(base, cpu)
 	, m_local(*(GSScanlineLocalData*)param)
 	, m_rip(false), many_regs(false)
@@ -187,43 +188,21 @@ void GSSetupPrimCodeGenerator2::Depth_XMM()
 
 		if (m_en.z)
 		{
-			if (m_sel.zequal)
+			// GSVector4 dz = p.zzzz();
+
+			shufps(xmm0, xmm0, _MM_SHUFFLE(2, 2, 2, 2));
+
+			// m_local.d4.z = dz * 4.0f;
+
+			THREEARG(mulps, xmm1, xmm0, xmm3);
+			movdqa(_rip_local_d_p(z), xmm1);
+
+			for (int i = 0; i < (m_sel.notest ? 1 : 4); i++)
 			{
-				u32 offset = 0;
-				if (m_sel.prim != GS_POINT_CLASS)
-					offset = sizeof(u32) * 1;
+				// m_local.d[i].z = dz * m_shift[i];
 
-				if (is32)
-					mov(_index, ptr[rsp + _32_index]);
-				mov(eax, ptr[_index + offset]);
-				shl(eax, 6); // * sizeof(GSVertexSW)
-				if (is64)
-					add(rax, _64_vertex);
-				else
-					add(rax, ptr[rsp + _32_vertex]);
-
-				movdqa(xmm0, ptr[rax + offsetof(GSVertexSW, t)]);
-				pshufd(xmm0, xmm0, _MM_SHUFFLE(3, 3, 3, 3));
-				movdqa(_rip_local(p.z), xmm0);
-			}
-			else
-			{
-				// GSVector4 dz = p.zzzz();
-
-				shufps(xmm0, xmm0, _MM_SHUFFLE(2, 2, 2, 2));
-
-				// m_local.d4.z = dz * 4.0f;
-
-				THREEARG(mulps, xmm1, xmm0, xmm3);
-				movdqa(_rip_local_d_p(z), xmm1);
-
-				for (int i = 0; i < (m_sel.notest ? 1 : 4); i++)
-				{
-					// m_local.d[i].z = dz * m_shift[i];
-
-					THREEARG(mulps, xmm1, xmm0, XYm(4 + i));
-					movdqa(_rip_local(d[i].z), xmm1);
-				}
+				THREEARG(mulps, xmm1, xmm0, XYm(4 + i));
+				movdqa(_rip_local(d[i].z), xmm1);
 			}
 		}
 	}
@@ -233,7 +212,7 @@ void GSSetupPrimCodeGenerator2::Depth_XMM()
 
 		if (is32)
 			mov(_index, ptr[rsp + _32_index]);
-		mov(eax, ptr[_index + sizeof(u32) * 1]);
+		mov(eax, ptr[_index + sizeof(uint32) * 1]);
 		shl(eax, 6); // * sizeof(GSVertexSW)
 		if (is64)
 			add(rax, _64_vertex);
@@ -253,7 +232,7 @@ void GSSetupPrimCodeGenerator2::Depth_XMM()
 
 		if (m_en.z)
 		{
-			// u32 z is bypassed in t.w
+			// uint32 z is bypassed in t.w
 
 			movdqa(xmm0, ptr[rax + offsetof(GSVertexSW, t)]);
 			pshufd(xmm0, xmm0, _MM_SHUFFLE(3, 3, 3, 3));
@@ -279,34 +258,13 @@ void GSSetupPrimCodeGenerator2::Depth_YMM()
 
 		if (m_en.z)
 		{
-			if (m_sel.zequal)
-			{
-				u32 offset = 0;
-				if (m_sel.prim != GS_POINT_CLASS)
-					offset = sizeof(u32) * 1;
+			// m_local.d8.p.z = dp8.extract32<2>();
 
-				if (is32)
-					mov(_index, ptr[rsp + _32_index]);
-				mov(eax, ptr[_index + offset]);
-				shl(eax, 6); // * sizeof(GSVertexSW)
-				if (is64)
-					add(rax, _64_vertex);
-				else
-					add(rax, ptr[rsp + _32_vertex]);
+			extractps(_rip_local_d_p(z), xmm1, 2);
 
-				mov(t1.cvt32(), ptr[rax + offsetof(GSVertexSW, t.w)]);
-				mov(_rip_local(p.z), t1.cvt32());
-			}
-			else
-			{
-				// m_local.d8.p.z = dp8.extract32<2>();
+			// GSVector8 dz = GSVector8(dscan.p).zzzz();
 
-				extractps(_rip_local_d_p(z), xmm1, 2);
-
-				// GSVector8 dz = GSVector8(dscan.p).zzzz();
-
-				vshufps(ymm2, ymm0, ymm0, _MM_SHUFFLE(2, 2, 2, 2));
-			}
+			vshufps(ymm2, ymm0, ymm0, _MM_SHUFFLE(2, 2, 2, 2));
 		}
 
 		if (m_en.f)
@@ -356,7 +314,7 @@ void GSSetupPrimCodeGenerator2::Depth_YMM()
 
 		if (is32)
 			mov(_index, ptr[rsp + _32_index]);
-		mov(eax, ptr[_index + sizeof(u32) * 1]);
+		mov(eax, ptr[_index + sizeof(uint32) * 1]);
 		shl(eax, 6); // * sizeof(GSVertexSW)
 		if (is64)
 			add(rax, _64_vertex);
@@ -374,7 +332,7 @@ void GSSetupPrimCodeGenerator2::Depth_YMM()
 
 		if (m_en.z)
 		{
-			// m_local.p.z = vertex[index[1]].t.u32[3]; // u32 z is bypassed in t.w
+			// m_local.p.z = vertex[index[1]].t.u32[3]; // uint32 z is bypassed in t.w
 
 			mov(t1.cvt32(), ptr[rax + offsetof(GSVertexSW, t.w)]);
 			mov(_rip_local(p.z), t1.cvt32());
@@ -566,7 +524,7 @@ void GSSetupPrimCodeGenerator2::Color()
 		{
 			if (is32)
 				mov(_index, ptr[rsp + _32_index]);
-			mov(eax, ptr[_index + sizeof(u32) * last]);
+			mov(eax, ptr[_index + sizeof(uint32) * last]);
 			shl(eax, 6); // * sizeof(GSVertexSW)
 			if (is64)
 				add(rax, _64_vertex);

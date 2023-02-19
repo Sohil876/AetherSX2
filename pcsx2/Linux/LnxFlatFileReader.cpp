@@ -17,11 +17,18 @@
 #include "AsyncFileReader.h"
 #include "common/FileSystem.h"
 
+#ifdef __ANDROID__
+bool FlatFileReader::USE_AIO = true;
+#endif
+
 FlatFileReader::FlatFileReader(bool shareWrite)
 	: shareWrite(shareWrite)
 {
 	m_blocksize = 2048;
 	m_fd = -1;
+#ifdef __ANDROID__
+	m_result = -1;
+#endif
 	m_aio_context = 0;
 }
 
@@ -34,9 +41,14 @@ bool FlatFileReader::Open(std::string fileName)
 {
 	m_filename = std::move(fileName);
 
-	int err = io_setup(64, &m_aio_context);
-	if (err)
-		return false;
+#ifdef __ANDROID__
+	if (USE_AIO)
+#endif
+	{
+		int err = io_setup(64, &m_aio_context);
+		if (err)
+			return false;
+	}
 
 	m_fd = FileSystem::OpenFDFile(m_filename.c_str(), O_RDONLY, 0);
 
@@ -56,6 +68,14 @@ void FlatFileReader::BeginRead(void* pBuffer, uint sector, uint count)
 
 	u32 bytesToRead = count * m_blocksize;
 
+#ifdef __ANDROID__
+	if (!USE_AIO)
+	{
+		m_result = pread(m_fd, pBuffer, bytesToRead, offset);
+		return;
+	}
+#endif
+
 	struct iocb iocb;
 	struct iocb* iocbs = &iocb;
 
@@ -65,6 +85,11 @@ void FlatFileReader::BeginRead(void* pBuffer, uint sector, uint count)
 
 int FlatFileReader::FinishRead(void)
 {
+#ifdef __ANDROID__
+	if (!USE_AIO)
+		return (m_result > 0);
+#endif
+
 	int min_nr = 1;
 	int max_nr = 1;
 	struct io_event events[max_nr];
@@ -86,14 +111,23 @@ void FlatFileReader::CancelRead(void)
 
 void FlatFileReader::Close(void)
 {
-
 	if (m_fd != -1)
+	{
 		close(m_fd);
+		m_fd = -1;
+	}
 
-	io_destroy(m_aio_context);
+#ifdef __ANDROID__
+	m_result = -1;
+#endif
 
-	m_fd = -1;
-	m_aio_context = 0;
+#ifdef __ANDROID__
+	if (USE_AIO)
+#endif
+	{
+		io_destroy(m_aio_context);
+		m_aio_context = 0;
+	}
 }
 
 uint FlatFileReader::GetBlockCount(void) const

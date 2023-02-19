@@ -21,6 +21,8 @@
 
 #pragma once
 
+#ifndef _M_ARM64
+
 #include <immintrin.h>
 // Can't stick them in structs because it breaks calling convention things, yay
 using r64  = __m128i;
@@ -83,6 +85,75 @@ __forceinline static r128 r128_from_u32x4(u32 lo0, u32 lo1, u32 hi0, u32 hi1)
 {
 	return _mm_setr_epi32(lo0, lo1, hi0, hi1);
 }
+
+#else
+
+#include <cstring>
+
+#ifdef _MSC_VER
+#include <arm64_neon.h>
+#else
+#include <arm_neon.h>
+#endif
+
+using r64 = u64;
+using r128 = uint32x4_t;
+
+#define RETURNS_R64 r64
+#define RETURNS_R128 r128 __vectorcall
+#define TAKES_R64
+#define TAKES_R128 __vectorcall
+
+__forceinline static r64 r64_load(const void* ptr)
+{
+	r64 ret;
+	std::memcpy(&ret, ptr, sizeof(ret));
+	return ret;
+}
+
+__forceinline static r64 r64_zero()
+{
+	return 0;
+}
+
+__forceinline static r64 r64_from_u32(u32 val)
+{
+	return static_cast<u64>(val);
+}
+
+__forceinline static r64 r64_from_u32x2(u32 lo, u32 hi)
+{
+	return (static_cast<u64>(hi) << 32) | static_cast<u64>(lo);
+}
+
+__forceinline static r64 r64_from_u64(u64 val)
+{
+	return val;
+}
+
+__forceinline static r128 r128_load(const void* ptr)
+{
+	return vld1q_u32(reinterpret_cast<const uint32_t*>(ptr));
+}
+
+__forceinline static r128 r128_zero()
+{
+	return vmovq_n_u32(0);
+}
+
+/// Expects that r64 came from r64-handling code, and not from a recompiler or something
+__forceinline static r128 r128_from_r64_clean(r64 val)
+{
+	return vreinterpretq_u32_u64(vmovq_n_u64(val));
+}
+
+__forceinline static r128 r128_from_u32x4(u32 lo0, u32 lo1, u32 hi0, u32 hi1)
+{
+	const u32 values[4] = { lo0, lo1, hi0, hi1 };
+	return vld1q_u32(values);
+}
+
+#endif
 
 template <typename u>
 struct rhelper;

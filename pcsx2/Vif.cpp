@@ -23,7 +23,7 @@
 #include "MTVU.h"
 #include "Gif_Unit.h"
 
-alignas(16) vifStruct vif0, vif1;
+__aligned16 vifStruct vif0, vif1;
 
 void vif0Reset()
 {

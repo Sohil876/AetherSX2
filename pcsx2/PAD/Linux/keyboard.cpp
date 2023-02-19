@@ -20,10 +20,7 @@
 
 #include "Global.h"
 #include "keyboard.h"
-#include "../Gamepad.h"
-
-extern HostKeyEvent event;
-extern MtQueue<HostKeyEvent> g_ev_fifo;
+#include "PAD.h"
 
 /// g_key_status.press but with proper handling for analog buttons
 static void PressButton(u32 pad, u32 button)

@@ -17,7 +17,6 @@
 
 #define _PC_ // disables MIPS opcode macros.
 
-#include "common/StringUtil.h"
 #include "IopCommon.h"
 #include "Patch.h"
 #include "Config.h"
@@ -136,7 +135,7 @@ int LoadPatchesFromGamesDB(const std::string& crc, const GameDatabaseSchema::Gam
 	if (patch)
 	{
 		for (const std::string& line : *patch)
-			inifile_command(StringUtil::UTF8StringToWxString(line));
+			inifile_command(line);
 	}
 
 	return Patch.size();

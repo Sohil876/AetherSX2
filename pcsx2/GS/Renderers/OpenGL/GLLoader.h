@@ -30,16 +30,20 @@ namespace GLExtension
 
 namespace GLLoader
 {
-	void check_gl_requirements();
+  void check_gl_requirements();
 
 	extern bool vendor_id_amd;
 	extern bool vendor_id_nvidia;
 	extern bool vendor_id_intel;
 	extern bool mesa_driver;
-	extern bool buggy_sso_dual_src;
+	extern bool buggy_pbo;
 	extern bool in_replayer;
 
 	// GL
+  extern bool is_gles;
+	extern bool has_dual_source_blend;
+	extern bool has_clip_control;
+	extern bool found_framebuffer_fetch;
 	extern bool found_geometry_shader;
 	extern bool found_GL_ARB_gpu_shader5;
 	extern bool found_GL_ARB_shader_image_load_store;

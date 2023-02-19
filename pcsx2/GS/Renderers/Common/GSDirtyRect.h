@@ -24,11 +24,11 @@ class GSDirtyRect
 	int right;
 	int bottom;
 
-	u32 psm;
+	uint32 psm;
 
 public:
 	GSDirtyRect();
-	GSDirtyRect(const GSVector4i& r, u32 psm);
+	GSDirtyRect(const GSVector4i& r, uint32 psm);
 	const GSVector4i GetDirtyRect(const GIFRegTEX0& TEX0) const;
 };
 

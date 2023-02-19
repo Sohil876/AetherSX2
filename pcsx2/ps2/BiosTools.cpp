@@ -32,16 +32,20 @@ static constexpr u32 DIRENTRY_SIZE = 16;
 // romdir structure (packing required!)
 // --------------------------------------------------------------------------------------
 //
-#pragma pack(push, 1)
+#if defined(_MSC_VER)
+#pragma pack(1)
+#endif
 
 struct romdir
 {
 	char fileName[10];
 	u16 extInfoSize;
 	u32 fileSize;
-};
+} __packed; // +16
 
-#pragma pack(pop)
+#ifdef _MSC_VER
+#pragma pack()
+#endif
 
 static_assert(sizeof(romdir) == DIRENTRY_SIZE, "romdir struct not packed to 16 bytes");
 
@@ -52,7 +56,6 @@ bool NoOSD;
 bool AllowParams1;
 bool AllowParams2;
 std::string BiosDescription;
-std::string BiosZone;
 std::string BiosPath;
 BiosDebugInformation CurrentBiosInformation;
 
@@ -81,24 +84,48 @@ static bool LoadBiosVersion(std::FILE* fp, u32& version, std::string& descriptio
 			char romver[14 + 1] = {}; // ascii version loaded from disk.
 
 			s64 pos = FileSystem::FTell64(fp);
-			if (FileSystem::FSeek64(fp, fileOffset, SEEK_SET) != 0 ||
-				std::fread(romver, 14, 1, fp) != 1 || FileSystem::FSeek64(fp, pos, SEEK_SET) != 0)
+			if (FileSystem::FSeek64(fp, fileOffset, SEEK_SET) == 0)
 			{
-				break;
+				if (std::fread(romver, 14, 1, fp) != 1)
+					std::memset(romver, 0, sizeof(romver));
+
+				FileSystem::FSeek64(fp, pos, SEEK_SET); //go back
 			}
 
 			switch (romver[4])
 			{
-				// clang-format off
-				case 'T': zone = "T10K";   region = 0; break;
-				case 'X': zone = "Test";	 region = 1; break;
-				case 'J': zone = "Japan";	 region = 2; break;
-				case 'A': zone = "USA";		 region = 3; break;
-				case 'E': zone = "Europe"; region = 4; break;
-				case 'H': zone = "HK";     region = 5; break;
-				case 'P': zone = "Free";   region = 6; break;
-				case 'C': zone = "China";  region = 7; break;
-					// clang-format on
+				case 'T':
+					zone = "T10K";
+					region = 0;
+					break;
+				case 'X':
+					zone = "Test";
+					region = 1;
+					break;
+				case 'J':
+					zone = "Japan";
+					region = 2;
+					break;
+				case 'A':
+					zone = "USA";
+					region = 3;
+					break;
+				case 'E':
+					zone = "Europe";
+					region = 4;
+					break;
+				case 'H':
+					zone = "HK";
+					region = 5;
+					break;
+				case 'P':
+					zone = "Free";
+					region = 6;
+					break;
+				case 'C':
+					zone = "China";
+					region = 7;
+					break;
 				default:
 					zone.clear();
 					zone += romver[4];
@@ -108,13 +135,15 @@ static bool LoadBiosVersion(std::FILE* fp, u32& version, std::string& descriptio
 			char vermaj[3] = {romver[0], romver[1], 0};
 			char vermin[3] = {romver[2], romver[3], 0};
 
+			FastFormatAscii result;
 			description = StringUtil::StdStringFromFormat("%-7s v%s.%s(%c%c/%c%c/%c%c%c%c)  %s",
 				zone.c_str(),
 				vermaj, vermin,
 				romver[12], romver[13], // day
 				romver[10], romver[11], // month
 				romver[6], romver[7], romver[8], romver[9], // year!
-				(romver[5] == 'C') ? "Console" : (romver[5] == 'D') ? "Devel" : "");
+				(romver[5] == 'C') ? "Console" : (romver[5] == 'D') ? "Devel" :
+                                                                      "");
 
 			version = strtol(vermaj, (char**)NULL, 0) << 8;
 			version |= strtol(vermin, (char**)NULL, 0);
@@ -262,11 +291,12 @@ bool LoadBIOS()
 	if (!fp)
 		return false;
 
-	const s64 filesize = FileSystem::FSize64(fp.get());
+	s64 filesize = FileSystem::FSize64(fp.get());
 	if (filesize <= 0)
 		return false;
 
-	LoadBiosVersion(fp.get(), BiosVersion, BiosDescription, BiosRegion, BiosZone);
+	std::string zone;
+	LoadBiosVersion(fp.get(), BiosVersion, BiosDescription, BiosRegion, zone);
 
 	if (FileSystem::FSeek64(fp.get(), 0, SEEK_SET) ||
 		std::fread(eeMem->ROM, static_cast<size_t>(std::min<s64>(Ps2MemSize::Rom, filesize)), 1, fp.get()) != 1)
@@ -285,10 +315,8 @@ bool LoadBIOS()
 	ChecksumIt(BiosChecksum, eeMem->ROM);
 	BiosPath = std::move(path);
 
-#ifndef PCSX2_CORE
-	Console.SetTitle(StringUtil::UTF8StringToWxString(StringUtil::StdStringFromFormat("Running BIOS (%s v%u.%u)",
-		BiosZone.c_str(), BiosVersion >> 8, BiosVersion & 0xff)));
-#endif
+	Console.SetTitle(StringUtil::StdStringFromFormat("Running BIOS (%s v%u.%u)",
+		zone.c_str(), BiosVersion >> 8, BiosVersion & 0xff));
 
 	//injectIRX("host.irx");	//not fully tested; still buggy
 

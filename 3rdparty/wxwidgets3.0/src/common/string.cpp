@@ -2058,7 +2058,11 @@ static int DoStringPrintfV(wxString& str,
         // wxVsnprintf() may modify the original arg pointer, so pass it
         // only a copy
         va_list argptrcopy;
+#ifdef __ANDROID__
+				va_copy(argptrcopy, argptr);
+#else
         wxVaCopy(argptrcopy, argptr);
+#endif
 
 #ifndef __WXWINCE__
         // Set errno to 0 to make it determinate if wxVsnprintf fails to set it.

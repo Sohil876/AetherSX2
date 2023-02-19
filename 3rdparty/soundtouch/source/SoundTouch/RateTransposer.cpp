@@ -61,7 +61,6 @@ RateTransposer::RateTransposer() : FIFOProcessor(&outputBuffer)
     // Instantiates the anti-alias filter
     pAAFilter = new AAFilter(64);
     pTransposer = TransposerBase::newInstance();
-    clear();
 }
 
 
@@ -78,7 +77,6 @@ void RateTransposer::enableAAFilter(bool newMode)
 #ifndef SOUNDTOUCH_PREVENT_CLICK_AT_RATE_CROSSOVER
     // Disable Anti-alias filter if desirable to avoid click at rate change zero value crossover
     bUseAAFilter = newMode;
-    clear();
 #endif
 }
 
@@ -194,11 +192,6 @@ void RateTransposer::clear()
     outputBuffer.clear();
     midBuffer.clear();
     inputBuffer.clear();
-    pTransposer->resetRegisters();
-
-    // prefill buffer to avoid losing first samples at beginning of stream
-    int prefill = getLatency();
-    inputBuffer.addSilent(prefill);
 }
 
 
@@ -216,8 +209,7 @@ int RateTransposer::isEmpty() const
 /// Return approximate initial input-output latency
 int RateTransposer::getLatency() const
 {
-    return pTransposer->getLatency() +
-        ((bUseAAFilter) ? (pAAFilter->getLength() / 2) : 0);
+    return (bUseAAFilter) ? pAAFilter->getLength() : 0;
 }
 
 

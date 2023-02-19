@@ -15,12 +15,26 @@
 
 #pragma once
 
+#include "GS/GS.h"
 #include "GS/GSCodeBuffer.h"
-#include "GS/GSExtra.h"
+
 #include "GS/Renderers/SW/GSScanlineEnvironment.h"
 #include "common/emitter/tools.h"
 
+#if defined(_M_X86_32) || defined(_M_X86_64)
+
 #include <xbyak/xbyak_util.h>
+
+#elif defined(_M_ARM64)
+
+#ifdef _MSC_VER
+// Things from arm64_neon.h which conflict.
+#undef mvn
+#endif
+
+#include "vixl/aarch64/macro-assembler-aarch64.h"
+
+#endif
 
 template <class KEY, class VALUE>
 class GSFunctionMap
@@ -28,8 +42,8 @@ class GSFunctionMap
 protected:
 	struct ActivePtr
 	{
-		u64 frame, frames, prims;
-		u64 ticks, actual, total;
+		uint64 frame, frames, prims;
+		uint64 ticks, actual, total;
 		VALUE f;
 	};
 
@@ -67,7 +81,7 @@ public:
 
 			memset(p, 0, sizeof(*p));
 
-			p->frame = (u64)-1;
+			p->frame = (uint64)-1;
 
 			p->f = GetDefaultFunction(key);
 
@@ -79,7 +93,7 @@ public:
 		return m_active->f;
 	}
 
-	void UpdateStats(u64 frame, u64 ticks, int actual, int total, int prims)
+	void UpdateStats(uint64 frame, uint64 ticks, int actual, int total, int prims)
 	{
 		if (m_active)
 		{
@@ -100,7 +114,7 @@ public:
 
 	virtual void PrintStats()
 	{
-		u64 totalTicks = 0;
+		uint64 totalTicks = 0;
 
 		for (const auto& i : m_map_active)
 		{
@@ -127,10 +141,10 @@ public:
 
 			if (p->frames && p->actual)
 			{
-				u64 tpf = p->ticks / p->frames;
+				uint64 tpf = p->ticks / p->frames;
 
 				printf("%016llx | %6llu | %5llu | %5.2f%% %5.1f %6.1f | %8llu %6llu %5.2f%%\n",
-					(u64)key,
+					(uint64)key,
 					p->frames,
 					p->prims / p->frames,
 					(double)(p->ticks * 100) / totalTicks,
@@ -144,6 +158,8 @@ public:
 	}
 };
 
+#if defined(_M_X86_32) || defined(_M_X86_64)
+
 class GSCodeGenerator : public Xbyak::CodeGenerator
 {
 protected:
@@ -156,12 +172,36 @@ public:
 	}
 };
 
+#elif defined(_M_ARM64)
+
+class GSCodeGenerator
+{
+public:
+	GSCodeGenerator(void* code, size_t maxsize)
+		: armAsm(static_cast<vixl::byte*>(code), maxsize)
+	{
+	}
+
+	size_t getSize() {
+		return armAsm.GetSizeOfCodeGenerated();
+	}
+
+	void* getCode() {
+		return armAsm.GetStartAddress<void*>();
+	}
+
+protected:
+	vixl::aarch64::MacroAssembler armAsm;
+};
+
+#endif
+
 template <class CG, class KEY, class VALUE>
 class GSCodeGeneratorFunctionMap : public GSFunctionMap<KEY, VALUE>
 {
 	std::string m_name;
 	void* m_param;
-	std::unordered_map<u64, VALUE> m_cgmap;
+	std::unordered_map<uint64, VALUE> m_cgmap;
 	GSCodeBuffer m_cb;
 	size_t m_total_code_size;
 
@@ -200,7 +240,7 @@ public:
 			ASSERT(cg->getSize() < MAX_SIZE);
 
 #if 0
-			fprintf(stderr, "%s Location:%p Size:%zu Key:%llx\n", m_name.c_str(), code_ptr, cg->getSize(), (u64)key);
+			fprintf(stderr, "%s Location:%p Size:%zu Key:%llx\n", m_name.c_str(), code_ptr, cg->getSize(), (uint64)key);
 			GSScanlineSelector sel(key);
 			sel.Print();
 #endif
@@ -219,7 +259,7 @@ public:
 
 			// if(iJIT_IsProfilingActive()) // always > 0
 			{
-				std::string name = format("%s<%016llx>()", m_name.c_str(), (u64)key);
+				std::string name = format("%s<%016llx>()", m_name.c_str(), (uint64)key);
 
 				iJIT_Method_Load ml;
 
@@ -232,7 +272,7 @@ public:
 
 				iJIT_NotifyEvent(iJVM_EVENT_TYPE_METHOD_LOAD_FINISHED, &ml);
 /*
-				name = format("c:/temp1/%s_%016llx.bin", m_name.c_str(), (u64)key);
+				name = format("c:/temp1/%s_%016llx.bin", m_name.c_str(), (uint64)key);
 
 				if(FILE* fp = fopen(name.c_str(), "wb"))
 				{
@@ -259,3 +299,4 @@ public:
 		return ret;
 	}
 };
+

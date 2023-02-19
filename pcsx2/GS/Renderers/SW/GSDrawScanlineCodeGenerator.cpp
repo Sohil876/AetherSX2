@@ -15,18 +15,28 @@
 
 #include "PrecompiledHeader.h"
 #include "GSDrawScanlineCodeGenerator.h"
+
+#if defined(_M_X86_32) || defined(_M_X86_64)
 #include "GSDrawScanlineCodeGenerator.all.h"
+#elif defined(_M_ARM64)
+#include "GSDrawScanlineCodeGenerator.arm64.h"
+#else
+#error Unknown target.
+#endif
 
-
-GSDrawScanlineCodeGenerator::GSDrawScanlineCodeGenerator(void* param, u64 key, void* code, size_t maxsize)
+GSDrawScanlineCodeGenerator::GSDrawScanlineCodeGenerator(void* param, uint64 key, void* code, size_t maxsize)
 	: GSCodeGenerator(code, maxsize)
 	, m_local(*(GSScanlineLocalData*)param)
 	, m_rip(false)
 {
 	m_sel.key = key;
 
+#if defined(_M_X86_32) || defined(_M_X86_64)
 	if (m_sel.breakpoint)
 		db(0xCC);
 
 	GSDrawScanlineCodeGenerator2(this, CPUInfo(m_cpu), (void*)&m_local, m_sel.key).Generate();
+#elif defined(_M_ARM64)
+	GSDrawScanlineCodeGenerator2(armAsm, param, key).Generate();
+#endif
 }

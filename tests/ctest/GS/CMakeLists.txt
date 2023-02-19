@@ -1,9 +1,15 @@
-foreach(isa "sse4" "avx" "avx2")
+foreach(isa "sse4" "avx" "avx2" "neon")
 	set(GSDir ${CMAKE_SOURCE_DIR}/pcsx2/GS)
 
-	if(${native_vector_isa} LESS ${isa_number_${isa}})
-		# Skip unsupported tests
-		continue()
+	if(${PCSX2_TARGET_ARCHITECTURES} STREQUAL "aarch64")
+		if(NOT ${isa} STREQUAL "neon")
+			continue()
+		endif()
+	else()
+		if(${native_vector_isa} LESS ${isa_number_${isa}})
+			# Skip unsupported tests
+			continue()
+		endif()
 	endif()
 
 	add_pcsx2_test(swizzle_test_${isa}

@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include "GS/GSGL.h"
+#include "GS/GS.h"
 #include "GS/GSVector.h"
 
 namespace GLState
@@ -25,11 +25,11 @@ namespace GLState
 	extern GSVector4i scissor;
 
 	extern bool blend;
-	extern u16 eq_RGB;
-	extern u16 f_sRGB;
-	extern u16 f_dRGB;
-	extern u8 bf;
-	extern u32 wrgba;
+	extern uint16 eq_RGB;
+	extern uint16 f_sRGB;
+	extern uint16 f_dRGB;
+	extern uint8 bf;
+	extern uint32 wrgba;
 
 	extern bool depth;
 	extern GLenum depth_func;
@@ -46,13 +46,7 @@ namespace GLState
 	extern GLuint tex_unit[8]; // shader input texture
 	extern GLuint64 tex_handle[8]; // shader input texture
 
-	extern GLuint ps;
-	extern GLuint gs;
-	extern GLuint vs;
-	extern GLuint program;
-	extern GLuint pipeline;
-
-	extern s64 available_vram;
+	extern int64 available_vram;
 
 	extern void Clear();
 } // namespace GLState

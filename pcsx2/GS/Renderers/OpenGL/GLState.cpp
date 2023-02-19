@@ -23,11 +23,11 @@ namespace GLState
 	GSVector4i scissor;
 
 	bool blend;
-	u16 eq_RGB;
-	u16 f_sRGB;
-	u16 f_dRGB;
-	u8 bf;
-	u32 wrgba;
+	uint16 eq_RGB;
+	uint16 f_sRGB;
+	uint16 f_dRGB;
+	uint8 bf;
+	uint32 wrgba;
 
 	bool depth;
 	GLenum depth_func;
@@ -44,47 +44,37 @@ namespace GLState
 	GLuint tex_unit[8];
 	GLuint64 tex_handle[8];
 
-	GLuint ps;
-	GLuint gs;
-	GLuint vs;
-	GLuint program;
-	GLuint pipeline;
-
-	s64 available_vram;
+	int64 available_vram;
 
 	void Clear()
 	{
 		fbo = 0;
-		viewport = GSVector2i(0, 0);
-		scissor = GSVector4i(0, 0, 0, 0);
+		viewport = GSVector2i(1, 1);
+		scissor = GSVector4i(0, 0, 1, 1);
 
 		blend = false;
-		eq_RGB = 0;
-		f_sRGB = 0;
-		f_dRGB = 0;
+		eq_RGB = GL_FUNC_ADD;
+		f_sRGB = GL_ONE;
+		f_dRGB = GL_ZERO;
 		bf = 0;
 		wrgba = 0xF;
 
 		depth = false;
-		depth_func = 0;
-		depth_mask = true;
+		depth_func = GL_LESS;
+		depth_mask = false;
 
 		stencil = false;
-		stencil_func = 0;
-		stencil_pass = 0xFFFF; // Note 0 is valid (GL_ZERO)
+		stencil_func = GL_ALWAYS;
+		stencil_pass = GL_KEEP;
 
 		ps_ss = 0;
 
 		rt = 0;
 		ds = 0;
-		std::fill(std::begin(tex_unit), std::end(tex_unit), 0);
-		std::fill(std::begin(tex_handle), std::end(tex_handle), 0);
-
-		ps = 0;
-		gs = 0;
-		vs = 0;
-		program  = 0;
-		pipeline = 0;
+		for (size_t i = 0; i < countof(tex_unit); i++)
+			tex_unit[i] = 0;
+		for (size_t i = 0; i < countof(tex_handle); i++)
+			tex_handle[i] = 0;
 
 		// Set a max vram limit for texture allocation
 		// (256MB are reserved for PBO/IBO/VBO/UBO buffers)

@@ -16,8 +16,6 @@
 #include "PrecompiledHeader.h"
 #include "GS.h"
 #include "GSCaptureDlg.h"
-#include "GS/GSExtra.h"
-#include <commdlg.h>
 
 // Ideally this belongs in WIL, but CAUUID is used by a *single* COM function in WinAPI.
 // That's presumably why it's omitted and is unlikely to make it to upstream WIL.
@@ -96,6 +94,7 @@ void GSCaptureDlg::UpdateConfigureButton()
 		return;
 	}
 
+#ifndef _M_ARM64
 	if (auto pSPP = c.filter.try_query<ISpecifyPropertyPages>())
 	{
 		unique_cauuid caGUID;
@@ -105,6 +104,7 @@ void GSCaptureDlg::UpdateConfigureButton()
 	{
 		enable = pAMVfWCD->ShowDialog(VfwCompressDialog_QueryConfig, nullptr) == S_OK;
 	}
+#endif
 	EnableWindow(GetDlgItem(m_hWnd, IDC_CONFIGURE), enable);
 }
 
@@ -182,7 +182,7 @@ bool GSCaptureDlg::OnCommand(HWND hWnd, UINT id, UINT code)
 				ofn.lStructSize = sizeof(ofn);
 				ofn.hwndOwner = m_hWnd;
 				ofn.lpstrFile = buff;
-				ofn.nMaxFile = std::size(buff);
+				ofn.nMaxFile = countof(buff);
 				ofn.lpstrFilter = L"Avi files (*.avi)\0*.avi\0";
 				ofn.Flags = OFN_EXPLORER | OFN_ENABLESIZING | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
 
@@ -204,6 +204,7 @@ bool GSCaptureDlg::OnCommand(HWND hWnd, UINT id, UINT code)
 				Codec c;
 				if (GetSelCodec(c) == 1)
 				{
+#ifndef _M_ARM64
 					if (auto pSPP = c.filter.try_query<ISpecifyPropertyPages>())
 					{
 						unique_cauuid caGUID;
@@ -218,6 +219,7 @@ bool GSCaptureDlg::OnCommand(HWND hWnd, UINT id, UINT code)
 						if (pAMVfWCD->ShowDialog(VfwCompressDialog_QueryConfig, NULL) == S_OK)
 							pAMVfWCD->ShowDialog(VfwCompressDialog_Config, m_hWnd);
 					}
+#endif
 				}
 				return true;
 			}

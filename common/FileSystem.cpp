@@ -73,6 +73,8 @@ static std::time_t ConvertFileTimeToUnixTime(const FILETIME& ft)
 }
 #endif
 
+#ifndef __ANDROID__
+
 static inline bool FileSystemCharacterIsSane(char c, bool StripSlashes)
 {
 	if (!(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') && c != ' ' && c != ' ' &&
@@ -149,6 +151,7 @@ std::string_view FileSystem::StripExtension(const std::string_view& path)
 
 	return path.substr(0, pos);
 }
+
 
 std::string FileSystem::ReplaceExtension(const std::string_view& path, const std::string_view& new_extension)
 {
@@ -437,6 +440,8 @@ int FileSystem::OpenFDFile(const char* filename, int flags, int mode)
 #endif
 }
 
+#endif
+
 FileSystem::ManagedCFilePtr FileSystem::OpenManagedCFile(const char* filename, const char* mode)
 {
 	return ManagedCFilePtr(OpenCFile(filename, mode), [](std::FILE* fp) { std::fclose(fp); });
@@ -447,7 +452,7 @@ int FileSystem::FSeek64(std::FILE* fp, s64 offset, int whence)
 #ifdef _WIN32
 	return _fseeki64(fp, offset, whence);
 #else
-	// Prevent truncation on platforms which don't have a 64-bit off_t.
+	// Prevent truncation on platforms which don't have a 64-bit off_t (Android 32-bit).
 	if constexpr (sizeof(off_t) != sizeof(s64))
 	{
 		if (offset < std::numeric_limits<off_t>::min() || offset > std::numeric_limits<off_t>::max())
@@ -1111,7 +1116,7 @@ bool FileSystem::SetWorkingDirectory(const char* path)
 	return (SetCurrentDirectoryW(wpath.c_str()) == TRUE);
 }
 
-#else
+#elif !defined(__ANDROID__)
 
 static u32 RecursiveFindFiles(const char* OriginPath, const char* ParentPath, const char* Path, const char* Pattern,
 	u32 Flags, FileSystem::FindResultsArray* pResults)

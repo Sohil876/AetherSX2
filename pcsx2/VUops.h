@@ -17,13 +17,39 @@
 #include "VU.h"
 #include "VUflags.h"
 
+#if !defined(_M_ARM64) || 1
 #define float_to_int4(x)	((float)x * (1.0f / 0.0625f))
 #define float_to_int12(x)	((float)x * (1.0f / 0.000244140625f))
 #define float_to_int15(x)	((float)x * (1.0f / 0.000030517578125))
 
-#define int4_to_float(x)	(float)((float)x * 0.0625f)
-#define int12_to_float(x)	(float)((float)x * 0.000244140625f)
-#define int15_to_float(x)	(float)((float)x * 0.000030517578125)
+#else
+
+static inline int float_to_int4(float x)
+{
+	x *= (1.0f / 0.0625f);
+	const int ix = static_cast<int>(x);
+	return (x > 2147483647 || x < -2147483648) ? 0x80000000 : ix;
+}
+
+static inline int float_to_int12(float x)
+{
+	x *= (1.0f / 0.000244140625f);
+	const int ix = static_cast<int>(x);
+	return (x > 2147483647 || x < -2147483648) ? 0x80000000 : ix;
+}
+
+static inline int float_to_int15(float x)
+{
+	x *= (1.0f / 0.000030517578125);
+	const int ix = static_cast<int>(x);
+	return (x > 2147483647 || x < -2147483648) ? 0x80000000 : ix;
+}
+
+#endif
+
+#define int4_to_float(x) (float)((float)x * 0.0625f)
+#define int12_to_float(x) (float)((float)x * 0.000244140625f)
+#define int15_to_float(x) (float)((float)x * 0.000030517578125)
 
 #define	MAC_Reset( VU ) VU->VI[REG_MAC_FLAG].UL = VU->VI[REG_MAC_FLAG].UL & (~0xFFFF)
 
@@ -44,15 +70,15 @@ struct _VURegsNum {
 typedef void __vuRegsCall FnType_VuRegsN(_VURegsNum *VUregsn);
 typedef FnType_VuRegsN* Fnptr_VuRegsN;
 
-alignas(16) extern const Fnptr_Void VU0_LOWER_OPCODE[128];
-alignas(16) extern const Fnptr_Void VU0_UPPER_OPCODE[64];
-alignas(16) extern const Fnptr_VuRegsN VU0regs_LOWER_OPCODE[128];
-alignas(16) extern const Fnptr_VuRegsN VU0regs_UPPER_OPCODE[64];
+extern __aligned16 const Fnptr_Void VU0_LOWER_OPCODE[128];
+extern __aligned16 const Fnptr_Void VU0_UPPER_OPCODE[64];
+extern __aligned16 const Fnptr_VuRegsN VU0regs_LOWER_OPCODE[128];
+extern __aligned16 const Fnptr_VuRegsN VU0regs_UPPER_OPCODE[64];
 
-alignas(16) extern const Fnptr_Void VU1_LOWER_OPCODE[128];
-alignas(16) extern const Fnptr_Void VU1_UPPER_OPCODE[64];
-alignas(16) extern const Fnptr_VuRegsN VU1regs_LOWER_OPCODE[128];
-alignas(16) extern const Fnptr_VuRegsN VU1regs_UPPER_OPCODE[64];
+extern __aligned16 const Fnptr_Void VU1_LOWER_OPCODE[128];
+extern __aligned16 const Fnptr_Void VU1_UPPER_OPCODE[64];
+extern __aligned16 const Fnptr_VuRegsN VU1regs_LOWER_OPCODE[128];
+extern __aligned16 const Fnptr_VuRegsN VU1regs_UPPER_OPCODE[64];
 extern void _vuClearFMAC(VURegs * VU);
 extern void _vuTestPipes(VURegs * VU);
 extern void _vuTestUpperStalls(VURegs * VU, _VURegsNum *VUregsn);

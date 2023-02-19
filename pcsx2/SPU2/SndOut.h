@@ -578,8 +578,8 @@ private:
 	static StereoOut32* m_buffer;
 	static s32 m_size;
 
-	alignas(4) static volatile s32 m_rpos;
-	alignas(4) static volatile s32 m_wpos;
+	static __aligned(4) volatile s32 m_rpos;
+	static __aligned(4) volatile s32 m_wpos;
 
 	static float lastEmergencyAdj;
 	static float cTempo;
@@ -625,7 +625,7 @@ public:
 	// the sample output is determined by the SndOutVolumeShift, which is the number of bits
 	// to shift right to get a 16 bit result.
 	template <typename T>
-	static void ReadSamples(T* bData);
+	static void ReadSamples(T* bData, int nSamples = SndOutPacketSize);
 };
 
 class SndOutModule
@@ -663,6 +663,9 @@ public:
 	virtual int GetEmptySampleCount() = 0;
 };
 
+#ifdef __ANDROID__
+extern SndOutModule* const OboeOut;
+#endif
 #ifdef _MSC_VER
 //internal
 extern SndOutModule* XAudio2Out;
@@ -670,7 +673,12 @@ extern SndOutModule* XAudio2Out;
 #if defined(SPU2X_PORTAUDIO)
 extern SndOutModule* PortaudioOut;
 #endif
+#if defined(SPU2X_CUBEB)
+extern SndOutModule* CubebOut;
+#endif
+#if defined(SDL_BUILD) && !defined(PCSX2_CORE)
 extern SndOutModule* const SDLOut;
+#endif
 extern SndOutModule* mods[];
 
 // =====================================================================================================

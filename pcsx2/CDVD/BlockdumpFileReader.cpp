@@ -62,11 +62,13 @@ BlockdumpFileReader::~BlockdumpFileReader(void)
 
 bool BlockdumpFileReader::Open(std::string fileName)
 {
-	char signature[4];
+	static constexpr u32 MAGIC_SIZE = 4;
+	char buf[MAGIC_SIZE + 1];
 
 	m_filename = std::move(fileName);
+
 	m_file = FileSystem::OpenCFile(m_filename.c_str(), "rb");
-	if (!m_file || std::fread(signature, sizeof(signature), 1, m_file) != 1 || std::memcmp(signature, "BDV2", sizeof(signature)) != 0)
+	if (!m_file || std::fread(buf, MAGIC_SIZE, 1, m_file) != 1 || std::strncmp(buf, "BDV2", MAGIC_SIZE) != 0)
 	{
 		return false;
 	}
@@ -85,7 +87,7 @@ bool BlockdumpFileReader::Open(std::string fileName)
 	pxAssert((datalen % (m_blocksize + 4)) == 0);
 
 	m_dtablesize = datalen / (m_blocksize + 4);
-	m_dtable = std::make_unique<u32[]>(m_dtablesize);
+	m_dtable = std::unique_ptr<u32[]>(new u32[m_dtablesize]);
 
 	if (FileSystem::FSeek64(m_file, BlockDumpHeaderSize, SEEK_SET) != 0)
 		return false;
@@ -131,9 +133,13 @@ int BlockdumpFileReader::ReadSync(void* pBuffer, uint lsn, uint count)
 
 #ifdef PCSX2_DEBUG
 			u32 check_lsn = 0;
-			FileSystem::FSeek64(m_file, BlockDumpHeaderSize + (i * (m_blocksize + 4)), SEEK_SET);
-			std::fread(&check_lsn, sizeof(check_lsn), 1, m_file);
-			pxAssert(check_lsn == lsn);
+			if (FileSystem::FSeek64(m_file, BlockDumpHeaderSize + (i * (m_blocksize + 4)), SEEK_SET) != 0 ||
+				std::fread(&check_lsn, sizeof(check_lsn), 1, m_file) != 1)
+			{
+				break;
+			}
+
+			pxAssert(!ok || check_lsn == lsn);
 #else
 			if (FileSystem::FSeek64(m_file, BlockDumpHeaderSize + (i * (m_blocksize + 4)) + 4, SEEK_SET) != 0)
 				break;

@@ -50,7 +50,7 @@ void RecompiledCodeReserve::_registerProfiler()
 {
 	if (m_profiler_name.IsEmpty() || !IsOk()) return;
 
-	Perf::any.map((uptr)m_baseptr, GetReserveSizeInBytes(), m_profiler_name.ToUTF8());
+	//Perf::any.map((uptr)m_baseptr, GetReserveSizeInBytes(), m_profiler_name.ToUTF8());
 }
 
 void RecompiledCodeReserve::_termProfiler()
@@ -70,14 +70,23 @@ void* RecompiledCodeReserve::Assign( VirtualMemoryManagerPtr allocator, void *ba
 
 void RecompiledCodeReserve::Reset()
 {
+#ifndef _M_ARM64
 	_parent::Reset();
+#else
+	m_pages_commited = 0;
+#endif
 
 	Commit();
 }
 
 bool RecompiledCodeReserve::Commit()
 {
+#ifndef _M_ARM64
 	bool status = _parent::Commit();
+#else
+	bool status = true;
+	m_pages_commited = m_pages_reserved;
+#endif
 
 	if (IsDevBuild && m_baseptr)
 	{
@@ -85,7 +94,7 @@ bool RecompiledCodeReserve::Commit()
 		// the assembly dump more cleanly.  We don't clear the block on Release builds since
 		// it can add a noticeable amount of overhead to large block recompilations.
 
-		memset(m_baseptr, 0xCC, m_pages_commited * __pagesize);
+		memset(m_baseptr, 0xCC, m_pages_reserved * __pagesize);
 	}
 
 	return status;
@@ -241,7 +250,7 @@ void SysLogMachineCaps()
 
 	Console.Newline();
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(PCSX2_CORE)
 	CheckIsUserOnHighPerfPowerPlan();
 #endif
 }
@@ -334,6 +343,8 @@ namespace HostMemoryMap {
 	uptr EEmem, IOPmem, VUmem, EErec, IOPrec, VIF0rec, VIF1rec, mVU0rec, mVU1rec, bumpAllocator;
 }
 
+#ifndef _M_ARM64
+
 /// Attempts to find a spot near static variables for the main memory
 static VirtualMemoryManagerPtr makeMainMemoryManager() {
 	// Everything looks nicer when the start of all the sections is a nice round looking number.
@@ -351,7 +362,7 @@ static VirtualMemoryManagerPtr makeMainMemoryManager() {
 			// VTLB will throw a fit if we try to put EE main memory here
 			continue;
 		}
-		auto mgr = std::make_shared<VirtualMemoryManager>("Main Memory Manager", base, HostMemoryMap::Size, /*upper_bounds=*/0, /*strict=*/true);
+		auto mgr = std::make_shared<VirtualMemoryManager>("Main Memory Manager", nullptr, base, HostMemoryMap::Size, /*upper_bounds=*/0, /*strict=*/true);
 		if (mgr->IsOk()) {
 			return mgr;
 		}
@@ -362,7 +373,7 @@ static VirtualMemoryManagerPtr makeMainMemoryManager() {
 	if (sizeof(void*) == 8) {
 		pxAssertRel(0, "Failed to find a good place for the main memory allocation, recompilers may fail");
 	}
-	return std::make_shared<VirtualMemoryManager>("Main Memory Manager", 0, HostMemoryMap::Size);
+	return std::make_shared<VirtualMemoryManager>("Main Memory Manager", nullptr, 0, HostMemoryMap::Size);
 }
 
 // --------------------------------------------------------------------------------------
@@ -384,6 +395,30 @@ SysMainMemory::SysMainMemory()
 	HostMemoryMap::mVU1rec = base + HostMemoryMap::mVU1recOffset;
 	HostMemoryMap::bumpAllocator = base + HostMemoryMap::bumpAllocatorOffset;
 }
+
+#else
+
+SysMainMemory::SysMainMemory()
+	: m_mainMemory(std::make_shared<VirtualMemoryManager>("Main Memory Manager", "pcsx2", 0, HostMemoryMap::MainSize))
+	, m_codeMemory(std::make_shared<VirtualMemoryManager>("Code Memory Manager", nullptr, 0, HostMemoryMap::CodeSize))
+	, m_bumpAllocator(m_mainMemory, HostMemoryMap::bumpAllocatorOffset, HostMemoryMap::MainSize - HostMemoryMap::bumpAllocatorOffset)
+	, m_codeBumpAllocator(m_codeMemory, HostMemoryMap::codeBumpAllocatorOffset, HostMemoryMap::CodeSize - HostMemoryMap::codeBumpAllocatorOffset)
+{
+	uptr main_base = (uptr)MainMemory()->GetBase();
+	uptr code_base = (uptr)MainMemory()->GetBase();
+	HostMemoryMap::EEmem   = main_base + HostMemoryMap::EEmemOffset;
+	HostMemoryMap::IOPmem  = main_base + HostMemoryMap::IOPmemOffset;
+	HostMemoryMap::VUmem   = main_base + HostMemoryMap::VUmemOffset;
+	HostMemoryMap::EErec   = code_base + HostMemoryMap::EErecOffset;
+	HostMemoryMap::IOPrec  = code_base + HostMemoryMap::IOPrecOffset;
+	HostMemoryMap::VIF0rec = code_base + HostMemoryMap::VIF0recOffset;
+	HostMemoryMap::VIF1rec = code_base + HostMemoryMap::VIF1recOffset;
+	HostMemoryMap::mVU0rec = code_base + HostMemoryMap::mVU0recOffset;
+	HostMemoryMap::mVU1rec = code_base + HostMemoryMap::mVU1recOffset;
+	HostMemoryMap::bumpAllocator = main_base + HostMemoryMap::bumpAllocatorOffset;
+}
+
+#endif
 
 SysMainMemory::~SysMainMemory()
 {
@@ -452,9 +487,6 @@ void SysMainMemory::DecommitAll()
 
 	closeNewVif(0);
 	closeNewVif(1);
-
-	g_GameStarted = false;
-	g_GameLoading = false;
 
 	vtlb_Core_Free();
 }

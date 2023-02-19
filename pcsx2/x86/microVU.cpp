@@ -23,8 +23,8 @@
 //------------------------------------------------------------------
 // Micro VU - Main Functions
 //------------------------------------------------------------------
-alignas(__pagesize) static u8 vu0_RecDispatchers[mVUdispCacheSize];
-alignas(__pagesize) static u8 vu1_RecDispatchers[mVUdispCacheSize];
+static u8 __pagealigned vu0_RecDispatchers[mVUdispCacheSize];
+static u8 __pagealigned vu1_RecDispatchers[mVUdispCacheSize];
 
 static __fi void mVUthrowHardwareDeficiency(const wxChar* extFail, int vuIndex)
 {
@@ -514,4 +514,68 @@ void SaveStateBase::vuJITFreeze()
 
 	Freeze(microVU0.prog.lpState);
 	Freeze(microVU1.prog.lpState);
+}
+
+#if 1
+static void pauseVVV()
+{
+	printf("Paused\n");
+}
+#endif
+
+void DumpVUState(u32 n, u32 pc)
+{
+	const VURegs& r = vuRegs[n];
+	static FILE* fp = nullptr;
+	static bool fp_opened = false;
+	static u32 counter = 0;
+
+	u32 first = pc >> 31;
+	pc &= 0x7FFFFFFFu;
+	if (first)
+		counter++;
+
+	if (counter < 24537)
+		return;
+
+#if 0
+	if (r.start_pc == 0x1810 && pc == 0x2058 && r.micro_macflags[3] == 0x00000080)
+		pauseVVV();
+#endif
+#if 1
+	if (counter == 24538 && pc == 0x0)
+		pauseVVV();
+#endif
+
+	if (!fp_opened)
+	{
+		fp = std::fopen("vulog.txt", "wb");
+		fp_opened = true;
+	}
+	if (fp)
+	{
+		const microVU& m = (n == 0) ? microVU0 : microVU1;
+		fprintf(fp, "%08d VU%u SPC:%04X xPC:%04X", counter, n, r.start_pc, pc);
+		fprintf(fp, " MAC %08X %08X %08X %08X [%08X %08X %08X %08X]", r.micro_macflags[3], r.micro_macflags[2], r.micro_macflags[1], r.micro_macflags[0], m.macFlag[3], m.macFlag[2], m.macFlag[1], m.macFlag[0]);
+		fprintf(fp, " CLIP %08X %08X %08X %08X [%08X %08X %08X %08X]", r.micro_clipflags[3], r.micro_clipflags[2], r.micro_clipflags[1], r.micro_clipflags[0], m.clipFlag[3], m.clipFlag[2], m.clipFlag[1], m.clipFlag[0]);
+		fprintf(fp, " STATUS %08X %08X %08X %08X [%08X %08X %08X %08X]", r.micro_statusflags[3], r.micro_statusflags[2], r.micro_statusflags[1], r.micro_statusflags[0], m.statFlag[3], m.statFlag[2], m.statFlag[1], m.statFlag[0]);
+
+		for (u32 i = 0; i < 32; i++)
+		{
+			const VECTOR& v = r.VF[i];
+			fprintf(fp, " VF%u: %08X%08X%08X%08X (%f,%f,%f,%f)", i, v.UL[3], v.UL[2], v.UL[1], v.UL[0], v.F[3], v.F[2], v.F[1], v.F[0]);
+		}
+
+		for (u32 i = 0; i < 32; i++)
+		{
+			const REG_VI& v = r.VI[i];
+			fprintf(fp, " VI%u: %08X (%f)", i, v.UL, v.F);
+		}
+
+		fprintf(fp, " ACC: %08X%08X%08X%08X (%f,%f,%f,%f)", r.ACC.UL[3], r.ACC.UL[2], r.ACC.UL[1], r.ACC.UL[0],
+			r.ACC.F[3], r.ACC.F[2], r.ACC.F[1], r.ACC.F[0]);
+		fprintf(fp, " Q: %08X (%f)", r.q.UL, r.q.F);
+		fprintf(fp, " P: %08X (%f)\n", r.p.UL, r.p.F);
+		fflush(fp);
+	}
 }

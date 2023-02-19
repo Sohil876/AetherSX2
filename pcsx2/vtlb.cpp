@@ -38,6 +38,12 @@
 
 #include "common/MemsetFast.inl"
 
+#include <map>
+#include <unordered_map>
+
+//#define FASTMEM_LOG(...) std::fprintf(stderr, __VA_ARGS__)
+#define FASTMEM_LOG(...)
+
 using namespace R5900;
 using namespace vtlb_private;
 
@@ -45,7 +51,7 @@ using namespace vtlb_private;
 
 namespace vtlb_private
 {
-	alignas(64) MapData vtlbdata;
+	__aligned(64) MapData vtlbdata;
 }
 
 static vtlbHandler vtlbHandlerCount = 0;
@@ -55,6 +61,27 @@ static vtlbHandler UnmappedVirtHandler0;
 static vtlbHandler UnmappedVirtHandler1;
 static vtlbHandler UnmappedPhyHandler0;
 static vtlbHandler UnmappedPhyHandler1;
+
+struct FastmemVirtualMapping
+{
+	u32 offset;
+	u32 size;
+};
+
+struct LoadstoreBackpatchInfo
+{
+	u32 gpr_bitmask;
+	u32 fpr_bitmask;
+	u8 address_register;
+	u8 data_register;
+	u8 size_in_bits;
+	bool is_signed;
+	bool is_load;
+	bool is_fpr;
+};
+
+static std::map<uptr, FastmemVirtualMapping> s_fastmem_virtual_mapping;
+static std::unordered_map<uptr, LoadstoreBackpatchInfo> s_fastmem_backpatch_info;
 
 vtlb_private::VTLBPhysical vtlb_private::VTLBPhysical::fromPointer(sptr ptr) {
 	pxAssertMsg(ptr >= 0, "Address too high");
@@ -482,13 +509,13 @@ static mem32_t __fastcall vtlbDefaultPhyRead32(u32 addr)
 	return 0;
 }
 
-static __m128i __vectorcall vtlbDefaultPhyRead64(u32 addr)
+static RETURNS_R64 vtlbDefaultPhyRead64(u32 addr)
 {
 	pxFailDev(pxsFmt("(VTLB) Attempted read64 from unmapped physical address @ 0x%08X.", addr));
 	return r64_zero();
 }
 
-static __m128i __vectorcall vtlbDefaultPhyRead128(u32 addr)
+static RETURNS_R128 vtlbDefaultPhyRead128(u32 addr)
 {
 	pxFailDev(pxsFmt("(VTLB) Attempted read128 from unmapped physical address @ 0x%08X.", addr));
 	return r128_zero();
@@ -587,7 +614,7 @@ void vtlb_MapHandler(vtlbHandler handler, u32 start, u32 size)
 	verify(0==(size&VTLB_PAGE_MASK) && size>0);
 
 	u32 end = start + (size - VTLB_PAGE_SIZE);
-	pxAssume( (end>>VTLB_PAGE_BITS) < std::size(vtlbdata.pmap) );
+	pxAssume( (end>>VTLB_PAGE_BITS) < ArraySize(vtlbdata.pmap) );
 
 	while (start <= end)
 	{
@@ -607,7 +634,7 @@ void vtlb_MapBlock(void* base, u32 start, u32 size, u32 blocksize)
 
 	sptr baseint = (sptr)base;
 	u32 end = start + (size - VTLB_PAGE_SIZE);
-	verify((end>>VTLB_PAGE_BITS) < std::size(vtlbdata.pmap));
+	verify((end>>VTLB_PAGE_BITS) < ArraySize(vtlbdata.pmap));
 
 	while (start <= end)
 	{
@@ -632,7 +659,7 @@ void vtlb_Mirror(u32 new_region,u32 start,u32 size)
 	verify(0==(size&VTLB_PAGE_MASK) && size>0);
 
 	u32 end = start + (size-VTLB_PAGE_SIZE);
-	verify((end>>VTLB_PAGE_BITS) < std::size(vtlbdata.pmap));
+	verify((end>>VTLB_PAGE_BITS) < ArraySize(vtlbdata.pmap));
 
 	while(start <= end)
 	{
@@ -658,6 +685,194 @@ __fi u32 vtlb_V2P(u32 vaddr)
 	return paddr;
 }
 
+template<typename T>
+static bool vtlb_Overlaps(T v_start, T v_end, T a_start, T a_end)
+{
+	return ((v_start >= a_start && v_end <= a_end) || (a_start >= v_start && a_end <= v_end));
+}
+
+static bool vtlb_GetMainMemoryOffset(u32 paddr, u32 size, u32* hoffset, u32* hsize)
+{
+	if (paddr >= 0x00000000 && paddr < 0x02000000)
+	{
+		// this is main RAM
+		*hoffset = HostMemoryMap::EEmemOffset + offsetof(EEVM_MemoryAllocMess, Main) + (paddr - 0x00000000);
+		*hsize = 0x02000000 - paddr;
+		return true;
+	}
+
+	if (paddr >= 0x1FC00000 && paddr < 0x20000000)
+	{
+		// this is BIOS ROM
+		*hoffset = HostMemoryMap::EEmemOffset + offsetof(EEVM_MemoryAllocMess, ROM) + (paddr - 0x1FC00000);
+		*hsize = 0x20000000 - paddr;
+		return true;
+	}
+
+#if 0
+	if (paddr >= 0x1C000000 && paddr < 0x1C200000)
+	{
+		// IOP ram
+		*hoffset = HostMemoryMap::IOPmemOffset + (paddr - 0x1C000000);
+		*hsize = 0x1C200000 - paddr;
+		return true;
+	}
+#endif
+
+	return false;
+}
+
+static bool vtlb_CreateFastmemMapping(u32 vaddr, u32 size, u32 mainmem_offset)
+{
+	uptr base = vtlbdata.fastmem_base + vaddr;
+
+	FastmemVirtualMapping m;
+	m.offset = mainmem_offset;
+	m.size = size;
+
+	if (!HostSys::MapSharedMemory(GetVmMemory().MainMemory()->GetFileHandle(), mainmem_offset, (void*)base, m.size, PageProtectionMode().Read().Write()))
+	{
+		fprintf(stderr, "Failed to create fastmem mapping at %p\n", (void*)base);
+		return false;
+	}
+
+	// fprintf(stderr, "Mapped fastmem at %08X-%08X (mainmem offset %u)\n", vaddr, vaddr + (size - 1), mainmem_offset);
+	s_fastmem_virtual_mapping.emplace(base, m);
+	return true;
+}
+
+static void vtlb_RemoveFastmemMappings()
+{
+	if (s_fastmem_virtual_mapping.empty())
+		return;
+
+	void* file_mapping = GetVmMemory().MainMemory()->GetFileHandle();
+	for (const auto& it : s_fastmem_virtual_mapping)
+		HostSys::UnmapSharedMemory(file_mapping, (void*)it.first, it.second.size);
+	s_fastmem_virtual_mapping.clear();
+}
+
+static void vtlb_RemoveFastmemMappings(u32 vaddr, u32 size)
+{
+	for (;;)
+	{
+		auto iter = s_fastmem_virtual_mapping.lower_bound(vaddr);
+		if (iter == s_fastmem_virtual_mapping.end())
+			break;
+
+		const u32 m_vaddr = static_cast<u32>(iter->first - vtlbdata.fastmem_base);
+		const u32 m_vaddrend = m_vaddr + (iter->second.size - 1);
+		if (!vtlb_Overlaps(vaddr, vaddr + (size - 1), m_vaddr, m_vaddrend))
+			break;
+
+		FASTMEM_LOG("Unmapping fastmem at %08X-%08X\n", vaddr, vaddr + (size - 1));
+		HostSys::UnmapSharedMemory(GetVmMemory().MainMemory()->GetFileHandle(), (void*)iter->first, iter->second.size);
+		s_fastmem_virtual_mapping.erase(iter);
+	}
+}
+
+bool vtlb_ResolveFastmemMapping(uptr* addr)
+{
+	uptr uaddr = *addr;
+	uptr fastmem_start = (uptr)vtlbdata.fastmem_base;
+	uptr fastmem_end = fastmem_start + 0xFFFFFFFFu;
+	if (uaddr < fastmem_start || uaddr > fastmem_end)
+		return false;
+
+	FASTMEM_LOG("Trying to resolve %p (vaddr %08X)\n", (void*)uaddr, static_cast<u32>(uaddr - fastmem_start));
+
+	for (auto iter = s_fastmem_virtual_mapping.begin(); iter != s_fastmem_virtual_mapping.end(); ++iter)
+	{
+		const uptr mbase = (uptr)iter->first;
+		const uptr mend = mbase + (iter->second.size - 1);
+		if (uaddr >= mbase && uaddr <= mend)
+		{
+			FASTMEM_LOG("Resolved %p (vaddr %08X) to mapping at %08X-%08X offset %u\n", uaddr, static_cast<u32>(uaddr - vtlbdata.fastmem_base), iter->second.offset, iter->second.offset + iter->second.size, static_cast<u32>(uaddr - mbase));
+			*addr = ((uptr)GetVmMemory().MainMemory()->GetBase()) + iter->second.offset + (uaddr - mbase);
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool vtlb_GetGuestAddress(uptr host_addr, u32* guest_addr)
+{
+	uptr fastmem_start = (uptr)vtlbdata.fastmem_base;
+	uptr fastmem_end = fastmem_start + 0xFFFFFFFFu;
+	if (host_addr < fastmem_start || host_addr > fastmem_end)
+		return false;
+
+	*guest_addr = static_cast<u32>(host_addr - fastmem_start);
+	return true;
+}
+
+void vtlb_UpdateFastmemProtection(uptr base, u32 size, const PageProtectionMode& prot)
+{
+	if (base < (uptr)GetVmMemory().MainMemory()->GetBase() || (base + size) > (uptr)GetVmMemory().MainMemory()->GetEnd())
+		return;
+
+	const u32 mainmem_start = static_cast<u32>(base - (uptr)GetVmMemory().MainMemory()->GetBase());
+	const u32 mainmem_end = mainmem_start + (size - 1);
+	FASTMEM_LOG("mprotect mainmem offset %08X-%08X...\n", mainmem_start, mainmem_end);
+
+	for (auto iter = s_fastmem_virtual_mapping.begin(); iter != s_fastmem_virtual_mapping.end(); ++iter)
+	{
+		const FastmemVirtualMapping& vm = iter->second;
+		if (!vtlb_Overlaps(mainmem_start, mainmem_end, vm.offset, vm.offset + (vm.size - 1)))
+			continue;
+
+		u32 rstart, rsize;
+		if (mainmem_start > vm.offset)
+		{
+			rstart = mainmem_start - vm.offset;
+			rsize = std::min<u32>(vm.size - rstart, size);
+		}
+		else
+		{
+			rstart = 0;
+			rsize = std::min<u32>(vm.size, size - static_cast<u32>(vm.offset - mainmem_start));
+		}
+
+		FASTMEM_LOG("  valias %08X (size %u)\n", static_cast<u32>(iter->first - vtlbdata.fastmem_base) + rstart, rsize);
+		HostSys::MemProtect((void*)(iter->first + rstart), rsize, prot);
+	}
+}
+
+void vtlb_AddLoadStoreInfo(uptr code_address, u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 data_register, u8 size_in_bits, bool is_signed, bool is_load, bool is_fpr)
+{
+	auto iter = s_fastmem_backpatch_info.find(code_address);
+	if (iter != s_fastmem_backpatch_info.end())
+		s_fastmem_backpatch_info.erase(iter);
+
+	LoadstoreBackpatchInfo info{gpr_bitmask, fpr_bitmask, address_register, data_register, size_in_bits, is_signed, is_load, is_fpr};
+	s_fastmem_backpatch_info.emplace(code_address, info);
+}
+
+bool vtlb_BackpatchLoadStore(uptr code_address, uptr fault_address)
+{
+	uptr fastmem_start = (uptr)vtlbdata.fastmem_base;
+	uptr fastmem_end = fastmem_start + 0xFFFFFFFFu;
+	if (fault_address < fastmem_start || fault_address > fastmem_end)
+		return false;
+
+	const u32 guest_addr = static_cast<u32>(fault_address - fastmem_start);
+	// fprintf(stderr, "Trying to backpatch loadstore at %p (vaddr 0x%08X)\n", (void*)code_address, guest_addr);
+
+	auto iter = s_fastmem_backpatch_info.find(code_address);
+	if (iter == s_fastmem_backpatch_info.end())
+		return false;
+
+#ifdef _M_ARM64
+	const LoadstoreBackpatchInfo& info = iter->second;
+	vtlb_DynBackpatchLoadStore(code_address, guest_addr, info.gpr_bitmask, info.fpr_bitmask, info.address_register, info.data_register, info.size_in_bits, info.is_signed, info.is_load, info.is_fpr);
+	s_fastmem_backpatch_info.erase(iter);
+	return true;
+#else
+	return false;
+#endif
+}
+
 //virtual mappings
 //TODO: Add invalid paddr checks
 void vtlb_VMap(u32 vaddr,u32 paddr,u32 size)
@@ -665,6 +880,47 @@ void vtlb_VMap(u32 vaddr,u32 paddr,u32 size)
 	verify(0==(vaddr&VTLB_PAGE_MASK));
 	verify(0==(paddr&VTLB_PAGE_MASK));
 	verify(0==(size&VTLB_PAGE_MASK) && size>0);
+
+	if (CHECK_FASTMEM)
+	{
+		u32 hoffset, hsize;
+		
+		auto existing_iter = s_fastmem_virtual_mapping.find(vtlbdata.fastmem_base + vaddr);
+		if (existing_iter != s_fastmem_virtual_mapping.end())
+		{
+			// reuse the existing mapping if present
+			if (!vtlb_GetMainMemoryOffset(paddr, size, &hoffset, &hsize) || existing_iter->second.offset != hoffset || existing_iter->second.size != hsize)
+				existing_iter = s_fastmem_virtual_mapping.end();
+		}
+
+		if (existing_iter == s_fastmem_virtual_mapping.end())
+		{
+			// get rid of any fastmem mappings
+			vtlb_RemoveFastmemMappings(vaddr, size);
+
+			// create new fastmem mappings if this is known
+			u32 rsize = size;
+			u32 rvaddr = vaddr;
+			u32 rpaddr = paddr;
+			while (rsize > 0)
+			{
+				u32 hoffset, hsize;
+				if (!vtlb_GetMainMemoryOffset(rpaddr, rsize, &hoffset, &hsize))
+				{
+					rvaddr += VTLB_PAGE_SIZE;
+					rpaddr += VTLB_PAGE_SIZE;
+					rsize -= VTLB_PAGE_SIZE;
+					continue;
+				}
+
+				hsize = std::min(hsize, rsize);
+				vtlb_CreateFastmemMapping(rvaddr, hsize, hoffset);
+				rvaddr += hsize;
+				rpaddr += hsize;
+				rsize -= hsize;
+			}
+		}
+	}
 
 	while (size > 0)
 	{
@@ -695,6 +951,13 @@ void vtlb_VMapBuffer(u32 vaddr,void* buffer,u32 size)
 	verify(0==(vaddr&VTLB_PAGE_MASK));
 	verify(0==(size&VTLB_PAGE_MASK) && size>0);
 
+	if (CHECK_FASTMEM)
+	{
+		vtlb_RemoveFastmemMappings(vaddr, size);
+		if (buffer == eeMem->Scratch && size == Ps2MemSize::Scratch)
+			vtlb_CreateFastmemMapping(vaddr, size, HostMemoryMap::EEmemOffset + offsetof(EEVM_MemoryAllocMess, Scratch));
+	}
+
 	uptr bu8 = (uptr)buffer;
 	while (size > 0)
 	{
@@ -709,6 +972,8 @@ void vtlb_VMapUnmap(u32 vaddr,u32 size)
 {
 	verify(0==(vaddr&VTLB_PAGE_MASK));
 	verify(0==(size&VTLB_PAGE_MASK) && size>0);
+
+	vtlb_RemoveFastmemMappings(vaddr, size);
 
 	while (size > 0)
 	{
@@ -732,11 +997,19 @@ void vtlb_Init()
 	vtlbHandlerCount=0;
 	memzero(vtlbdata.RWFT);
 
+#ifndef _M_ARM64
 #define VTLB_BuildUnmappedHandler(baseName, highBit) \
 	baseName##ReadSm<mem8_t,0>,		baseName##ReadSm<mem16_t,0>,	baseName##ReadSm<mem32_t,0>, \
 	baseName##ReadLg<mem64_t,0>,	baseName##ReadLg<mem128_t,0>, \
 	baseName##WriteSm<mem8_t,0>,	baseName##WriteSm<mem16_t,0>,	baseName##WriteSm<mem32_t,0>, \
 	baseName##WriteLg<mem64_t,0>,	baseName##WriteLg<mem128_t,0>
+#else
+#define VTLB_BuildUnmappedHandler(baseName, highBit) \
+	baseName##ReadSm<mem8_t,0>,		baseName##ReadSm<mem16_t,0>,	baseName##ReadSm<mem32_t,0>, \
+	baseName##ReadSm<mem64_t,0>,	baseName##ReadLg<mem128_t,0>, \
+	baseName##WriteSm<mem8_t,0>,	baseName##WriteSm<mem16_t,0>,	baseName##WriteSm<mem32_t,0>, \
+	baseName##WriteLg<mem64_t,0>,	baseName##WriteLg<mem128_t,0>
+#endif
 
 	//Register default handlers
 	//Unmapped Virt handlers _MUST_ be registered first.
@@ -766,14 +1039,17 @@ void vtlb_Init()
 	if (EmuConfig.Gamefixes.GoemonTlbHack)
 		vtlb_Alloc_Ppmap();
 
+#ifndef _M_ARM64
 	extern void vtlb_dynarec_init();
 	vtlb_dynarec_init();
+#endif
 }
 
 // vtlb_Reset -- Performs a COP0-level reset of the PS2's TLB.
 // This function should probably be part of the COP0 rather than here in VTLB.
 void vtlb_Reset()
 {
+	vtlb_RemoveFastmemMappings();
 	for(int i=0; i<48; i++) UnmapTLB(i);
 }
 
@@ -783,6 +1059,7 @@ void vtlb_Term()
 }
 
 constexpr size_t VMAP_SIZE = sizeof(VTLBVirtual) * VTLB_VMAP_ITEMS;
+constexpr size_t FASTMEM_AREA_SIZE = 0x100000000ULL;
 
 // Reserves the vtlb core allocation used by various emulation components!
 // [TODO] basemem - request allocating memory at the specified virtual location, which can allow
@@ -796,15 +1073,12 @@ void vtlb_Core_Alloc()
 		vmap = (VTLBVirtual*)GetVmMemory().BumpAllocator().Alloc(VMAP_SIZE);
 	if (!vtlbdata.vmap)
 	{
-		bool okay = HostSys::MmapCommitPtr(vmap, VMAP_SIZE, PageProtectionMode().Read().Write());
-		if (okay) {
-			vtlbdata.vmap = vmap;
-		} else {
-			throw Exception::OutOfMemory( L"VTLB Virtual Address Translation LUT" )
-				.SetDiagMsg(pxsFmt("(%u megs)", VTLB_VMAP_ITEMS * sizeof(*vtlbdata.vmap) / _1mb)
-			);
-		}
+		HostSys::MemProtect(vmap, VMAP_SIZE, PageProtectionMode().Read().Write());
+		vtlbdata.vmap = vmap;
 	}
+
+	if (!vtlbdata.fastmem_base)
+		vtlbdata.fastmem_base = (uptr)HostSys::ReserveSharedMemoryArea(FASTMEM_AREA_SIZE);
 }
 
 // The LUT is only used for 1 game so we allocate it only when the gamefix is enabled (save 4MB)
@@ -826,10 +1100,17 @@ void vtlb_Alloc_Ppmap()
 void vtlb_Core_Free()
 {
 	if (vtlbdata.vmap) {
-		HostSys::MmapResetPtr(vtlbdata.vmap, VMAP_SIZE);
+		HostSys::MemProtect(vtlbdata.vmap, VMAP_SIZE, PageProtectionMode());
 		vtlbdata.vmap = nullptr;
 	}
 	safe_aligned_free( vtlbdata.ppmap );
+
+	vtlb_RemoveFastmemMappings();
+	if (vtlbdata.fastmem_base)
+	{
+		HostSys::Munmap(vtlbdata.fastmem_base, FASTMEM_AREA_SIZE);
+		vtlbdata.fastmem_base = 0;
+	}
 }
 
 static wxString GetHostVmErrorMsg()

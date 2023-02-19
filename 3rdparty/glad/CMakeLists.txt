@@ -6,7 +6,7 @@ if(WIN32)
 	target_sources(glad PRIVATE
 		src/glad_wgl.c
 	)
-elseif(X11_API OR WAYLAND_API)
+elseif(X11_API OR WAYLAND_API OR ANDROID)
 	target_sources(glad PRIVATE
 		src/glad_egl.c
 	)

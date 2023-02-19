@@ -1,7 +1,7 @@
 // GH: AMD memcpy was removed. The remaining part (memcmp_mmx) is likely from Zerofrog.
 // Hopefully memcmp_mmx will be dropped in the future.
 
-#if defined(_WIN32) && !defined(_M_AMD64)
+#if defined(_WIN32) && !defined(_M_AMD64) && !defined(_M_ARM64)
 #include "common/MemcpyFast.h"
 #include "common/Assertions.h"
 

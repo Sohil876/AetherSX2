@@ -15,12 +15,14 @@
 
 #pragma once
 
+#include "GS_types.h"
+
 class GSCodeBuffer
 {
 	std::vector<void*> m_buffers;
 	size_t m_blocksize;
 	size_t m_pos, m_reserved;
-	u8* m_ptr;
+	uint8* m_ptr;
 
 public:
 	GSCodeBuffer(size_t blocksize = 4096 * 64); // 256k

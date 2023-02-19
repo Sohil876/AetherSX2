@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(SolutionDir)common\vsprops\BaseProjectConfig.props" />
   <Import Project="$(SolutionDir)common\vsprops\WinSDK.props" />
@@ -16,6 +16,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\marmasm.props" />
     <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets">
@@ -33,12 +34,13 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir)3rdparty\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)3rdparty\glad\include;$(SolutionDir)3rdparty\glslang;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ExceptionHandling>Async</ExceptionHandling>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <ForcedIncludeFiles>PrecompiledHeader.h</ForcedIncludeFiles>
       <PrecompiledHeaderFile>PrecompiledHeader.h</PrecompiledHeaderFile>
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)%(RelativeDir)</ObjectFileName>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -51,9 +53,12 @@
     </ClCompile>
     <ClCompile Include="GL\Context.cpp" />
     <ClCompile Include="GL\ContextWGL.cpp" />
+    <ClCompile Include="GL\Program.cpp" />
+    <ClCompile Include="GL\ShaderCache.cpp" />
     <ClCompile Include="GL\StreamBuffer.cpp" />
     <ClCompile Include="FileSystem.cpp" />
     <ClCompile Include="IniInterface.cpp" />
+    <ClCompile Include="MD5Digest.cpp" />
     <ClCompile Include="ProgressCallback.cpp" />
     <ClCompile Include="pxStreams.cpp" />
     <ClCompile Include="pxTranslate.cpp" />
@@ -61,6 +66,18 @@
     <ClCompile Include="SettingsWrapper.cpp" />
     <ClCompile Include="Timer.cpp" />
     <ClCompile Include="VirtualMemory.cpp" />
+    <ClCompile Include="Vulkan\vk_mem_alloc.cpp" />
+    <ClCompile Include="Vulkan\Builders.cpp" />
+    <ClCompile Include="Vulkan\Context.cpp" />
+    <ClCompile Include="Vulkan\Loader.cpp" />
+    <ClCompile Include="Vulkan\ShaderCache.cpp" />
+    <ClCompile Include="Vulkan\ShaderCompiler.cpp" />
+    <ClCompile Include="Vulkan\StagingBuffer.cpp" />
+    <ClCompile Include="Vulkan\StagingTexture.cpp" />
+    <ClCompile Include="Vulkan\StreamBuffer.cpp" />
+    <ClCompile Include="Vulkan\SwapChain.cpp" />
+    <ClCompile Include="Vulkan\Texture.cpp" />
+    <ClCompile Include="Vulkan\Util.cpp" />
     <ClCompile Include="WindowInfo.cpp" />
     <ClCompile Include="x86\MemcpyFast.cpp" />
     <ClCompile Include="PathUtils.cpp" />
@@ -99,20 +116,30 @@
       <FileType>Document</FileType>
       <PreprocessorDefinitions Condition="'$(Platform)'=='Win32'">_M_X86_32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Platform)'=='x64'">_M_X86_64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ExcludedFromBuild Condition="'$(Platform)'=='ARM64'">true</ExcludedFromBuild>
     </MASM>
+    <None Include="Vulkan\EntryPoints.inl" />
+    <MARMASM Include="..\..\pcsx2\common\FastJmp_arm64.asm">
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Platform)'!='ARM64'">true</ExcludedFromBuild>
+    </MARMASM>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Align.h" />
-    <ClInclude Include="AlignedMalloc.h" />
     <ClInclude Include="BitCast.h" />
     <ClInclude Include="EmbeddedImage.h" />
     <ClInclude Include="boost_spsc_queue.hpp" />
     <ClInclude Include="FastJmp.h" />
     <ClInclude Include="GL\Context.h" />
     <ClInclude Include="GL\ContextWGL.h" />
+    <ClInclude Include="GL\Program.h" />
+    <ClInclude Include="GL\ShaderCache.h" />
     <ClInclude Include="GL\StreamBuffer.h" />
     <ClInclude Include="FileSystem.h" />
+    <ClInclude Include="HashCombine.h" />
+    <ClInclude Include="MD5Digest.h" />
     <ClInclude Include="ProgressCallback.h" />
+    <ClInclude Include="ScopedAlloc.h" />
     <ClInclude Include="ScopedGuard.h" />
     <ClInclude Include="StringUtil.h" />
     <ClInclude Include="SettingsInterface.h" />
@@ -132,6 +159,18 @@
     <ClInclude Include="SafeArray.h" />
     <ClInclude Include="StringHelpers.h" />
     <ClInclude Include="Timer.h" />
+    <ClInclude Include="Vulkan\Builders.h" />
+    <ClInclude Include="Vulkan\Context.h" />
+    <ClInclude Include="Vulkan\EntryPoints.h" />
+    <ClInclude Include="Vulkan\Loader.h" />
+    <ClInclude Include="Vulkan\ShaderCache.h" />
+    <ClInclude Include="Vulkan\ShaderCompiler.h" />
+    <ClInclude Include="Vulkan\StagingBuffer.h" />
+    <ClInclude Include="Vulkan\StagingTexture.h" />
+    <ClInclude Include="Vulkan\StreamBuffer.h" />
+    <ClInclude Include="Vulkan\SwapChain.h" />
+    <ClInclude Include="Vulkan\Texture.h" />
+    <ClInclude Include="Vulkan\Util.h" />
     <ClInclude Include="WindowInfo.h" />
     <ClInclude Include="wxBaseTools.h" />
     <ClInclude Include="Threading.h" />
@@ -167,18 +206,19 @@
     <ProjectReference Include="..\3rdparty\glad\glad.vcxproj">
       <Project>{c0293b32-5acf-40f0-aa6c-e6da6f3bf33a}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\3rdparty\glslang\glslang.vcxproj">
+      <Project>{ef6834a9-11f3-4331-bc34-21b325abb180}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\3rdparty\pthreads4w\build\pthreads4w.vcxproj">
       <Project>{0fae817d-9a32-4830-857e-81da57246e16}</Project>
     </ProjectReference>
     <ProjectReference Include="..\3rdparty\wxwidgets3.0\build\msw\wx30_base.vcxproj">
       <Project>{3fcc50c2-81e9-5db2-b8d8-2129427568b1}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\3rdparty\wxwidgets3.0\build\msw\wx30_core.vcxproj">
-      <Project>{6744dad8-9c70-574a-bff2-9f8dddb24a75}</Project>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\marmasm.targets" />
     <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   </ImportGroup>
 </Project>

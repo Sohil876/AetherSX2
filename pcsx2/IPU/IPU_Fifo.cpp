@@ -17,9 +17,8 @@
 #include "Common.h"
 #include "IPU.h"
 #include "IPU/IPUdma.h"
-#include "mpeg2lib/Mpeg.h"
 
-alignas(16) IPU_Fifo ipu_fifo;
+__aligned16 IPU_Fifo ipu_fifo;
 
 void IPU_Fifo::init()
 {

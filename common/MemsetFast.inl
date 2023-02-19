@@ -15,6 +15,8 @@
 
 #pragma once
 
+#if defined(_M_X86_32) || defined(_M_X86_64)
+
 #include <xmmintrin.h>
 
 template <u8 data>
@@ -28,7 +30,7 @@ __noinline void memset_sse_a(void* dest, const size_t size)
 
 	if (data != 0)
 	{
-		alignas(16) static const u8 loadval[8] = {data, data, data, data, data, data, data, data};
+		static __aligned16 const u8 loadval[8] = {data, data, data, data, data, data, data, data};
 		srcreg = _mm_loadh_pi(_mm_load_ps((float*)loadval), (__m64*)loadval);
 	}
 	else
@@ -93,3 +95,28 @@ void memzero_sse_a(T& dest)
 	static_assert((sizeof(dest) & 0xf) == 0, "Bad size for SSE memset");
 	memset_sse_a<0>(&dest, sizeof(dest));
 }
+
+#elif defined(_M_ARM64)
+
+#include <cstring>
+
+static __fi void memzero_sse_a(void* dest, const size_t size)
+{
+  std::memset(dest, 0, size);
+}
+
+template <u8 data, typename T>
+__noinline void memset_sse_a(T& dest)
+{
+  static_assert((sizeof(dest) & 0xf) == 0, "Bad size for SSE memset");
+  std::memset(dest, data, sizeof(dest));
+}
+
+template <typename T>
+void memzero_sse_a(T& dest)
+{
+  static_assert((sizeof(dest) & 0xf) == 0, "Bad size for SSE memset");
+  std::memset(&dest, 0, sizeof(dest));
+}
+
+#endif

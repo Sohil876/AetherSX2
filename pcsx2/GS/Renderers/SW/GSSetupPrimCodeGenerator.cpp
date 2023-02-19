@@ -15,11 +15,16 @@
 
 #include "PrecompiledHeader.h"
 #include "GSSetupPrimCodeGenerator.h"
+
+#if defined(_M_X86_32) || defined(_M_X86_64)
 #include "GSSetupPrimCodeGenerator.all.h"
+#elif defined(_M_ARM64)
+#include "GSSetupPrimCodeGenerator.arm64.h"
+#else
+#error Unknown target.
+#endif
 
-using namespace Xbyak;
-
-GSSetupPrimCodeGenerator::GSSetupPrimCodeGenerator(void* param, u64 key, void* code, size_t maxsize)
+GSSetupPrimCodeGenerator::GSSetupPrimCodeGenerator(void* param, uint64 key, void* code, size_t maxsize)
 	: GSCodeGenerator(code, maxsize)
 	, m_local(*(GSScanlineLocalData*)param)
 	, m_rip(false)
@@ -31,5 +36,9 @@ GSSetupPrimCodeGenerator::GSSetupPrimCodeGenerator(void* param, u64 key, void* c
 	m_en.t = m_sel.fb && m_sel.tfx != TFX_NONE ? 1 : 0;
 	m_en.c = m_sel.fb && !(m_sel.tfx == TFX_DECAL && m_sel.tcc) ? 1 : 0;
 
+#if defined(_M_X86_32) || defined(_M_X86_64)
 	GSSetupPrimCodeGenerator2(this, CPUInfo(m_cpu), param, key).Generate();
+#elif defined(_M_ARM64)
+	GSSetupPrimCodeGenerator2(armAsm, param, key).Generate();
+#endif
 }

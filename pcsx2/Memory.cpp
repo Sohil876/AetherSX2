@@ -672,7 +672,7 @@ public:
 static mmap_PageFaultHandler* mmap_faultHandler = NULL;
 
 EEVM_MemoryAllocMess* eeMem = NULL;
-alignas(__pagesize) u8 eeHw[Ps2MemSize::Hardware];
+__pagealigned u8 eeHw[Ps2MemSize::Hardware];
 
 
 void memBindConditionalHandlers()
@@ -905,7 +905,7 @@ struct vtlb_PageProtectionInfo
 	vtlb_ProtectionMode Mode;
 };
 
-alignas(16) static vtlb_PageProtectionInfo m_PageProtectInfo[Ps2MemSize::MainRam >> 12];
+static __aligned16 vtlb_PageProtectionInfo m_PageProtectInfo[Ps2MemSize::MainRam >> 12];
 
 
 // returns:
@@ -921,7 +921,7 @@ vtlb_ProtectionMode mmap_GetRamPageInfo( u32 paddr )
 	uptr ptr = (uptr)PSM( paddr );
 	uptr rampage = ptr - (uptr)eeMem->Main;
 
-	if (rampage >= Ps2MemSize::MainRam)
+	if (!ptr || rampage >= Ps2MemSize::MainRam)
 		return ProtMode_NotRequired; //not in ram, no tracking done ...
 
 	rampage >>= 12;
@@ -954,6 +954,7 @@ void mmap_MarkCountedRamPage( u32 paddr )
 
 	m_PageProtectInfo[rampage].Mode = ProtMode_Write;
 	HostSys::MemProtect( &eeMem->Main[rampage<<12], __pagesize, PageAccess_ReadOnly() );
+	vtlb_UpdateFastmemProtection((uptr)&eeMem->Main[rampage << 12], __pagesize, PageAccess_ReadOnly());
 }
 
 // offset - offset of address relative to psM.
@@ -971,6 +972,7 @@ static __fi void mmap_ClearCpuBlock( uint offset )
 		"Attempted to clear a block that is already under manual protection." );
 
 	HostSys::MemProtect( &eeMem->Main[rampage<<12], __pagesize, PageAccess_ReadWrite() );
+	vtlb_UpdateFastmemProtection((uptr)&eeMem->Main[rampage << 12], __pagesize, PageAccess_ReadWrite());
 	m_PageProtectInfo[rampage].Mode = ProtMode_Manual;
 	Cpu->Clear( m_PageProtectInfo[rampage].ReverseRamMap, 0x400 );
 }
@@ -979,12 +981,37 @@ void mmap_PageFaultHandler::OnPageFaultEvent( const PageFaultInfo& info, bool& h
 {
 	pxAssert( eeMem );
 
-	// get bad virtual address
-	uptr offset = info.addr - (uptr)eeMem->Main;
-	if( offset >= Ps2MemSize::MainRam ) return;
+	u32 vaddr;
+	if (CHECK_FASTMEM && vtlb_GetGuestAddress(info.addr, &vaddr))
+	{
+		// this was inside the fastmem area. check if it's a code page
+		// fprintf(stderr, "Fault on fastmem %p vaddr %08X\n", info.addr, vaddr);
 
-	mmap_ClearCpuBlock( offset );
-	handled = true;
+		uptr ptr = (uptr)PSM(vaddr);
+		uptr offset = (ptr - (uptr)eeMem->Main);
+		if (ptr && m_PageProtectInfo[offset >> 12].Mode == ProtMode_Write)
+		{
+			// fprintf(stderr, "Not backpatching code write at %08X\n", vaddr);
+			mmap_ClearCpuBlock(offset);
+			handled = true;
+		}
+		else
+		{
+			// fprintf(stderr, "Trying backpatching vaddr %08X\n", vaddr);
+			if (vtlb_BackpatchLoadStore(info.pc, info.addr))
+				handled = true;
+		}
+	}
+	else
+	{
+		// get bad virtual address
+		uptr offset = info.addr - (uptr)eeMem->Main;
+		if (offset >= Ps2MemSize::MainRam)
+			return;
+
+		mmap_ClearCpuBlock(offset);
+		handled = true;
+	}
 }
 
 // Clears all block tracking statuses, manual protection flags, and write protection.

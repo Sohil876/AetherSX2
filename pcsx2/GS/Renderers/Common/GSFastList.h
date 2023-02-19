@@ -15,12 +15,14 @@
 
 #pragma once
 
+#include "GS/GS_types.h"
+
 template <class T>
 struct Element
 {
 	T data;
-	u16 next_index;
-	u16 prev_index;
+	uint16 next_index;
+	uint16 prev_index;
 };
 
 template <class T>
@@ -45,11 +47,11 @@ private:
 	//     the relevant iterator (or the index alone) are erased from the list.
 	// m_buffer[0] is always present as auxiliary Element<T> of the list
 	Element<T>* m_buffer;
-	u16 m_capacity;
-	u16 m_free_indexes_stack_top;
+	uint16 m_capacity;
+	uint16 m_free_indexes_stack_top;
 	// m_free_indexes_stack has dynamic size (m_capacity - 1)
 	// m_buffer indexes that are free to be used are stacked here
-	u16* m_free_indexes_stack;
+	uint16* m_free_indexes_stack;
 
 public:
 	__forceinline FastList()
@@ -72,8 +74,8 @@ public:
 		// Initialize m_buffer and m_free_indexes_stack as a contiguous block of memory starting at m_buffer
 		// This should increase cache locality and reduce memory fragmentation
 		_aligned_free(m_buffer);
-		m_buffer = (Element<T>*)_aligned_malloc(m_capacity * sizeof(Element<T>) + (m_capacity - 1) * sizeof(u16), 64);
-		m_free_indexes_stack = (u16*)&m_buffer[m_capacity];
+		m_buffer = (Element<T>*)_aligned_malloc(m_capacity * sizeof(Element<T>) + (m_capacity - 1) * sizeof(uint16), 64);
+		m_free_indexes_stack = (uint16*)&m_buffer[m_capacity];
 
 		// Initialize m_buffer[0], data field is unused but initialized using default T constructor
 		m_buffer[0] = {T(), 0, 0};
@@ -82,14 +84,14 @@ public:
 		m_free_indexes_stack_top = 0;
 
 		// m_buffer index 0 is reserved for auxiliary element
-		for (u16 i = 0; i < m_capacity - 1; i++)
+		for (uint16 i = 0; i < m_capacity - 1; i++)
 		{
 			m_free_indexes_stack[i] = i + 1;
 		}
 	}
 
 	// Insert the element in front of the list and return its position in m_buffer
-	__forceinline u16 InsertFront(const T& data)
+	__forceinline uint16 InsertFront(const T& data)
 	{
 		if (Full())
 		{
@@ -97,7 +99,7 @@ public:
 		}
 
 		// Pop a free index from the stack
-		const u16 free_index = m_free_indexes_stack[m_free_indexes_stack_top++];
+		const uint16 free_index = m_free_indexes_stack[m_free_indexes_stack_top++];
 		m_buffer[free_index].data = data;
 		ListInsertFront(free_index);
 		return free_index;
@@ -118,7 +120,7 @@ public:
 		EraseIndex(LastIndex());
 	}
 
-	__forceinline u16 size() const
+	__forceinline uint16 size() const
 	{
 		return m_free_indexes_stack_top;
 	}
@@ -128,13 +130,13 @@ public:
 		return size() == 0;
 	}
 
-	__forceinline void EraseIndex(const u16 index)
+	__forceinline void EraseIndex(const uint16 index)
 	{
 		ListRemove(index);
 		m_free_indexes_stack[--m_free_indexes_stack_top] = index;
 	}
 
-	__forceinline void MoveFront(const u16 index)
+	__forceinline void MoveFront(const uint16 index)
 	{
 		if (FirstIndex() != index)
 		{
@@ -161,29 +163,29 @@ public:
 
 private:
 	// Accessed by FastListIterator<T> using class friendship
-	__forceinline const T& Data(const u16 index) const
+	__forceinline const T& Data(const uint16 index) const
 	{
 		return m_buffer[index].data;
 	}
 
 	// Accessed by FastListIterator<T> using class friendship
-	__forceinline u16 NextIndex(const u16 index) const
+	__forceinline uint16 NextIndex(const uint16 index) const
 	{
 		return m_buffer[index].next_index;
 	}
 
 	// Accessed by FastListIterator<T> using class friendship
-	__forceinline u16 PrevIndex(const u16 index) const
+	__forceinline uint16 PrevIndex(const uint16 index) const
 	{
 		return m_buffer[index].prev_index;
 	}
 
-	__forceinline u16 FirstIndex() const
+	__forceinline uint16 FirstIndex() const
 	{
 		return m_buffer[0].next_index;
 	}
 
-	__forceinline u16 LastIndex() const
+	__forceinline uint16 LastIndex() const
 	{
 		return m_buffer[0].prev_index;
 	}
@@ -194,7 +196,7 @@ private:
 		return size() == m_capacity - 1;
 	}
 
-	__forceinline void ListInsertFront(const u16 index)
+	__forceinline void ListInsertFront(const uint16 index)
 	{
 		// Update prev / next indexes to add m_buffer[index] to the chain
 		Element<T>& head = m_buffer[0];
@@ -204,7 +206,7 @@ private:
 		head.next_index = index;
 	}
 
-	__forceinline void ListRemove(const u16 index)
+	__forceinline void ListRemove(const uint16 index)
 	{
 		// Update prev / next indexes to remove m_buffer[index] from the chain
 		const Element<T>& to_remove = m_buffer[index];
@@ -219,13 +221,13 @@ private:
 			throw std::runtime_error("FastList size maxed out at USHRT_MAX (65535) elements, cannot grow futhermore.");
 		}
 
-		const u16 new_capacity = m_capacity <= (USHRT_MAX / 2) ? (m_capacity * 2) : USHRT_MAX;
+		const uint16 new_capacity = m_capacity <= (USHRT_MAX / 2) ? (m_capacity * 2) : USHRT_MAX;
 
-		Element<T>* new_buffer = (Element<T>*)_aligned_malloc(new_capacity * sizeof(Element<T>) + (new_capacity - 1) * sizeof(u16), 64);
-		u16* new_free_indexes_stack = (u16*)&new_buffer[new_capacity];
+		Element<T>* new_buffer = (Element<T>*)_aligned_malloc(new_capacity * sizeof(Element<T>) + (new_capacity - 1) * sizeof(uint16), 64);
+		uint16* new_free_indexes_stack = (uint16*)&new_buffer[new_capacity];
 
 		memcpy(new_buffer, m_buffer, m_capacity * sizeof(Element<T>));
-		memcpy(new_free_indexes_stack, m_free_indexes_stack, (m_capacity - 1) * sizeof(u16));
+		memcpy(new_free_indexes_stack, m_free_indexes_stack, (m_capacity - 1) * sizeof(uint16));
 
 		_aligned_free(m_buffer);
 
@@ -233,7 +235,7 @@ private:
 		m_free_indexes_stack = new_free_indexes_stack;
 
 		// Initialize the additional space in the stack
-		for (u16 i = m_capacity - 1; i < new_capacity - 1; i++)
+		for (uint16 i = m_capacity - 1; i < new_capacity - 1; i++)
 		{
 			m_free_indexes_stack[i] = i + 1;
 		}
@@ -249,10 +251,10 @@ class FastListIterator
 {
 private:
 	const FastList<T>* m_fastlist;
-	u16 m_index;
+	uint16 m_index;
 
 public:
-	__forceinline FastListIterator(const FastList<T>* fastlist, const u16 index)
+	__forceinline FastListIterator(const FastList<T>* fastlist, const uint16 index)
 	{
 		m_fastlist = fastlist;
 		m_index = index;
@@ -303,7 +305,7 @@ public:
 		return m_fastlist->Data(m_index);
 	}
 
-	__forceinline u16 Index() const
+	__forceinline uint16 Index() const
 	{
 		return m_index;
 	}

@@ -22,7 +22,7 @@
 #define xMOV64(regX, loc)  xMOVUPS (regX, loc)
 #define xMOV128(regX, loc) xMOVUPS (regX, loc)
 
-alignas(16) static const u32 SSEXYZWMask[4][4] =
+static const __aligned16 u32 SSEXYZWMask[4][4] =
 {
 	{0xffffffff, 0xffffffff, 0xffffffff, 0x00000000},
 	{0xffffffff, 0xffffffff, 0x00000000, 0xffffffff},
@@ -30,7 +30,7 @@ alignas(16) static const u32 SSEXYZWMask[4][4] =
 	{0x00000000, 0xffffffff, 0xffffffff, 0xffffffff}
 };
 
-//alignas(__pagesize) static u8 nVifUpkExec[__pagesize*4];
+//static __pagealigned u8 nVifUpkExec[__pagesize*4];
 static RecompiledCodeReserve* nVifUpkExec = NULL;
 
 // Merges xmm vectors without modifying source reg
@@ -346,7 +346,7 @@ void VifUnpackSSE_Init()
 
 	nVifUpkExec = new RecompiledCodeReserve(L"VIF SSE-optimized Unpacking Functions", _64kb);
 	nVifUpkExec->SetProfilerName("iVIF-SSE");
-	nVifUpkExec->Reserve(GetVmMemory().BumpAllocator(), _64kb);
+	nVifUpkExec->Reserve(GetVmMemory().CodeBumpAllocator(), _64kb);
 
 	nVifUpkExec->ThrowIfNotOk();
 

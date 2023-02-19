@@ -14,12 +14,17 @@
  */
 
 #if !defined(_WIN32) && !defined(__APPLE__)
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <unistd.h>
 #if defined(__linux__)
 #include <sys/prctl.h>
 #elif defined(__unix__)
 #include <pthread_np.h>
 #endif
+#include <sched.h>
 
 #include "common/PersistentThread.h"
 
@@ -48,7 +53,9 @@ __forceinline void Threading::SpinWait()
 {
 	// If this doesn't compile you can just comment it out (it only serves as a
 	// performance hint and isn't required).
+#ifndef __aarch64__
 	__asm__("pause");
+#endif
 }
 
 __forceinline void Threading::EnableHiresScheduler()
@@ -103,17 +110,18 @@ u64 Threading::pxThread::GetCpuTime() const
 	// thread has used on the CPU (scaled by the value returned by GetThreadTicksPerSecond(),
 	// which typically would be an OS-provided scalar or some sort).
 
-	if (!m_native_id)
+	if (!m_native_handle)
 		return 0;
 
-	return get_thread_time(m_native_id);
+	return get_thread_time(m_native_handle);
 }
 
 void Threading::pxThread::_platform_specific_OnStartInThread()
 {
 	// Obtain linux-specific thread IDs or Handles here, which can be used to query
 	// kernel scheduler performance information.
-	m_native_id = (uptr)pthread_self();
+	m_native_handle = (uptr)pthread_self();
+	m_native_id = (uptr)gettid();
 }
 
 void Threading::pxThread::_platform_specific_OnCleanupInThread()
@@ -130,6 +138,46 @@ void Threading::SetNameOfCurrentThread(const char* name)
 #elif defined(__unix__)
 	pthread_set_name_np(pthread_self(), name);
 #endif
+}
+
+static void internalSetAffinity(pid_t tid, u64 processor_mask)
+{
+	cpu_set_t set;
+	CPU_ZERO(&set);
+
+	if (processor_mask != 0)
+	{
+		for (u32 i = 0; i < 64; i++)
+		{
+			if (processor_mask & (static_cast<u64>(1) << i))
+			{
+				CPU_SET(i, &set);
+			}
+		}
+	}
+	else
+	{
+		long num_processors = sysconf(_SC_NPROCESSORS_CONF);
+		for (long i = 0; i < num_processors; i++)
+		{
+			CPU_SET(i, &set);
+		}
+	}
+
+	if (sched_setaffinity(tid, sizeof(set), &set) < 0)
+	{
+		perror("sched_setaffinity");
+	}
+}
+
+void Threading::pxThread::SetAffinity(u64 processor_mask)
+{
+	internalSetAffinity((pid_t)m_native_id, processor_mask);
+}
+
+void Threading::SetAffinityForCurrentThread(u64 processor_mask)
+{
+	internalSetAffinity(0, processor_mask);
 }
 
 #endif

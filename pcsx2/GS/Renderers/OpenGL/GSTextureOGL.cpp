@@ -17,32 +17,33 @@
 #include <limits.h>
 #include "GSTextureOGL.h"
 #include "GLState.h"
+#include "GS/GSPerfMon.h"
 #include "GS/GSPng.h"
 
 #ifdef ENABLE_OGL_DEBUG_MEM_BW
-extern u64 g_real_texture_upload_byte;
+extern uint64 g_real_texture_upload_byte;
 #endif
 
 // FIXME OGL4: investigate, only 1 unpack buffer always bound
 namespace PboPool
 {
 
-	const u32 m_pbo_size = 64 * 1024 * 1024;
-	const u32 m_seg_size = 16 * 1024 * 1024;
+	const uint32 m_pbo_size = 64 * 1024 * 1024;
+	const uint32 m_seg_size = 16 * 1024 * 1024;
 
 	GLuint m_buffer;
 	uptr m_offset;
 	char* m_map;
-	u32 m_size;
+	uint32 m_size;
 	GLsync m_fence[m_pbo_size / m_seg_size];
 
 	// Option for buffer storage
 	// XXX: actually does I really need coherent and barrier???
 	// As far as I understand glTexSubImage2D is a client-server transfer so no need to make
 	// the value visible to the server
-	const GLbitfield common_flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT;
-	const GLbitfield map_flags = common_flags | GL_MAP_FLUSH_EXPLICIT_BIT;
-	const GLbitfield create_flags = common_flags | GL_CLIENT_STORAGE_BIT;
+	const GLbitfield common_flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | (GLLoader::is_gles ? GL_MAP_COHERENT_BIT : 0);
+	const GLbitfield map_flags = common_flags | (GLLoader::is_gles ? 0 : GL_MAP_FLUSH_EXPLICIT_BIT);
+	const GLbitfield create_flags = common_flags | (GLLoader::is_gles ? 0 : GL_CLIENT_STORAGE_BIT);
 
 	void Init()
 	{
@@ -52,16 +53,22 @@ namespace PboPool
 
 		glObjectLabel(GL_BUFFER, m_buffer, -1, "PBO");
 
-		glBufferStorage(GL_PIXEL_UNPACK_BUFFER, m_pbo_size, NULL, create_flags);
+    if (!GLAD_GL_ARB_buffer_storage && GLAD_GL_EXT_buffer_storage)
+      glBufferStorageEXT(GL_PIXEL_UNPACK_BUFFER, m_pbo_size, NULL, create_flags);
+    else
+      glBufferStorage(GL_PIXEL_UNPACK_BUFFER, m_pbo_size, NULL, create_flags);
 		m_map = (char*)glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0, m_pbo_size, map_flags);
 		m_offset = 0;
 
-		std::fill(std::begin(m_fence), std::end(m_fence), nullptr);
+		for (size_t i = 0; i < countof(m_fence); i++)
+		{
+			m_fence[i] = 0;
+		}
 
 		UnbindPbo();
 	}
 
-	char* Map(u32 size)
+	char* Map(uint32 size)
 	{
 		char* map;
 		// Note: keep offset aligned for SSE/AVX
@@ -85,7 +92,8 @@ namespace PboPool
 
 	void Unmap()
 	{
-		glFlushMappedBufferRange(GL_PIXEL_UNPACK_BUFFER, m_offset, m_size);
+		if (!GLLoader::is_gles)
+			glFlushMappedBufferRange(GL_PIXEL_UNPACK_BUFFER, m_offset, m_size);
 	}
 
 	uptr Offset()
@@ -98,9 +106,9 @@ namespace PboPool
 		m_map = NULL;
 		m_offset = 0;
 
-		for (GLsync fence : m_fence)
+		for (size_t i = 0; i < countof(m_fence); i++)
 		{
-			glDeleteSync(fence);
+			glDeleteSync(m_fence[i]);
 		}
 
 		glDeleteBuffers(1, &m_buffer);
@@ -113,12 +121,12 @@ namespace PboPool
 
 	void Sync()
 	{
-		u32 segment_current = m_offset / m_seg_size;
-		u32 segment_next = (m_offset + m_size) / m_seg_size;
+		uint32 segment_current = m_offset / m_seg_size;
+		uint32 segment_next = (m_offset + m_size) / m_seg_size;
 
 		if (segment_current != segment_next)
 		{
-			if (segment_next >= std::size(m_fence))
+			if (segment_next >= countof(m_fence))
 			{
 				segment_next = 0;
 			}
@@ -161,8 +169,8 @@ namespace PboPool
 	}
 } // namespace PboPool
 
-GSTextureOGL::GSTextureOGL(Type type, int w, int h, Format format, GLuint fbo_read, bool mipmap)
-	: m_clean(false), m_generate_mipmap(true), m_r_x(0), m_r_y(0), m_r_w(0), m_r_h(0), m_layer(0)
+GSTextureOGL::GSTextureOGL(int type, int w, int h, int format, GLuint fbo_read, bool mipmap)
+	: m_clean(false), m_generate_mipmap(true), m_local_buffer(nullptr), m_r_x(0), m_r_y(0), m_r_w(0), m_r_h(0), m_layer(0)
 {
 	// OpenGL didn't like dimensions of size 0
 	m_size.x = std::max(1, w);
@@ -173,71 +181,97 @@ GSTextureOGL::GSTextureOGL(Type type, int w, int h, Format format, GLuint fbo_re
 	m_texture_id = 0;
 	m_sparse = false;
 	m_max_layer = 1;
-	int gl_fmt = 0;
 
 	// Bunch of constant parameter
 	switch (m_format)
 	{
-		// 1 Channel integer
-		case Format::Int32:
-			gl_fmt          = GL_R32I;
+			// 1 Channel integer
+		case GL_R32UI:
+		case GL_R32I:
 			m_int_format    = GL_RED_INTEGER;
-			m_int_type      = GL_INT;
+			m_int_type      = (m_format == GL_R32UI) ? GL_UNSIGNED_INT : GL_INT;
 			m_int_shift     = 2;
 			break;
-		case Format::UInt32:
-			gl_fmt          = GL_R32UI;
-			m_int_format    = GL_RED_INTEGER;
-			m_int_type      = GL_UNSIGNED_INT;
-			m_int_shift     = 2;
-			break;
-		case Format::UInt16:
-			gl_fmt          = GL_R16UI;
+		case GL_R16UI:
 			m_int_format    = GL_RED_INTEGER;
 			m_int_type      = GL_UNSIGNED_SHORT;
 			m_int_shift     = 1;
 			break;
 
-		// 1 Channel normalized
-		case Format::UNorm8:
-			gl_fmt          = GL_R8;
+			// 1 Channel normalized
+		case GL_R8:
 			m_int_format    = GL_RED;
 			m_int_type      = GL_UNSIGNED_BYTE;
 			m_int_shift     = 0;
 			break;
 
-		// 4 channel normalized
-		case Format::Color:
-			gl_fmt          = GL_RGBA8;
+			// 4 channel normalized
+		case GL_RGBA16:
+			m_int_format    = GL_RGBA;
+			m_int_type      = GL_UNSIGNED_SHORT;
+			m_int_shift     = 3;
+			break;
+		case GL_RGBA8:
 			m_int_format    = GL_RGBA;
 			m_int_type      = GL_UNSIGNED_BYTE;
 			m_int_shift     = 2;
 			break;
 
-		// 4 channel float
-		case Format::FloatColor:
-			gl_fmt          = GL_RGBA32F;
+			// 4 channel integer
+		case GL_RGBA16I:
+		case GL_RGBA16UI:
+			m_int_format    = GL_RGBA_INTEGER;
+			m_int_type      = (m_format == GL_R16UI) ? GL_UNSIGNED_SHORT : GL_SHORT;
+			m_int_shift     = 3;
+			break;
+
+			// 4 channel float
+		case GL_RGBA32F:
 			m_int_format    = GL_RGBA;
 			m_int_type      = GL_FLOAT;
 			m_int_shift     = 4;
 			break;
+		case GL_RGBA16F:
+			m_int_format    = GL_RGBA;
+			m_int_type      = GL_HALF_FLOAT;
+			m_int_shift     = 3;
+			break;
 
-		// Depth buffer
-		case Format::DepthStencil:
-			gl_fmt          = GL_DEPTH32F_STENCIL8;
+			// Depth buffer
+		case GL_DEPTH_COMPONENT16:
+			m_int_format = GL_DEPTH_COMPONENT;
+			m_int_type = GL_UNSIGNED_SHORT;
+			m_int_shift = 1;
+			break;
+		case GL_DEPTH_COMPONENT24:
+			m_int_format = GL_DEPTH_COMPONENT;
+			m_int_type = GL_UNSIGNED_INT;
+			m_int_shift = 2;
+			break;
+		case GL_DEPTH_COMPONENT32:
+			m_int_format    = GL_DEPTH_COMPONENT;
+			m_int_type      = GL_UNSIGNED_INT;
+			m_int_shift     = 2;
+			break;
+		case GL_DEPTH_COMPONENT32F:
+			m_int_format    = GL_DEPTH_COMPONENT;
+			m_int_type      = GL_FLOAT;
+			m_int_shift     = 2;
+			break;
+		case GL_DEPTH32F_STENCIL8:
 			m_int_format    = GL_DEPTH_STENCIL;
 			m_int_type      = GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
 			m_int_shift     = 3; // 4 bytes for depth + 4 bytes for stencil by texels
 			break;
 
-		// Backbuffer
-		case Format::Backbuffer:
+			// Backbuffer
+		case 0:
 			m_int_format    = 0;
 			m_int_type      = 0;
 			m_int_shift     = 2; // 4 bytes by texels
 			break;
 
-		case Format::Invalid:
+		default:
 			m_int_format    = 0;
 			m_int_type      = 0;
 			m_int_shift     = 0;
@@ -246,14 +280,16 @@ GSTextureOGL::GSTextureOGL(Type type, int w, int h, Format format, GLuint fbo_re
 
 	switch (m_type)
 	{
-		case Type::Backbuffer:
-			return; // backbuffer isn't a real texture
-		case Type::Texture:
-			// Only 32 bits input texture will be supported for mipmap
-			m_max_layer = mipmap && m_format == Format::Color ? (int)log2(std::max(w, h)) : 1;
+		case GSTexture::Offscreen:
+			// Offscreen is only used to read color. So it only requires 4B by pixel
+			m_local_buffer = (uint8*)_aligned_malloc(m_size.x * m_size.y * 4, 32);
 			break;
-		case Type::SparseRenderTarget:
-		case Type::SparseDepthStencil:
+		case GSTexture::Texture:
+			// Only 32 bits input texture will be supported for mipmap
+			m_max_layer = mipmap && m_format == GL_RGBA8 ? (int)log2(std::max(w, h)) : 1;
+			break;
+		case SparseRenderTarget:
+		case SparseDepthStencil:
 			m_sparse = true;
 			break;
 		default:
@@ -262,37 +298,45 @@ GSTextureOGL::GSTextureOGL(Type type, int w, int h, Format format, GLuint fbo_re
 
 	switch (m_format)
 	{
-		case Format::UInt16:
-		case Format::UNorm8:
+		case GL_R16UI:
+		case GL_R8:
 			m_sparse &= GLLoader::found_compatible_GL_ARB_sparse_texture2;
 			SetGpuPageSize(GSVector2i(255, 255));
 			break;
 
-		case Format::Color:
-		case Format::UInt32:
-		case Format::Int32:
-		case Format::Backbuffer:
+		case GL_R32UI:
+		case GL_R32I:
+		case GL_RGBA16:
+		case GL_RGBA8:
+		case GL_RGBA16I:
+		case GL_RGBA16UI:
+		case GL_RGBA16F:
+		case 0:
 			m_sparse &= GLLoader::found_compatible_GL_ARB_sparse_texture2;
 			SetGpuPageSize(GSVector2i(127, 127));
 			break;
 
-		case Format::FloatColor:
+		case GL_RGBA32F:
 			m_sparse &= GLLoader::found_compatible_GL_ARB_sparse_texture2;
 			SetGpuPageSize(GSVector2i(63, 63));
 			break;
 
-		case Format::DepthStencil:
+		case GL_DEPTH_COMPONENT16:
+		case GL_DEPTH_COMPONENT24:
+		case GL_DEPTH_COMPONENT32:
+		case GL_DEPTH_COMPONENT32F:
+		case GL_DEPTH32F_STENCIL8:
 			m_sparse &= GLLoader::found_compatible_sparse_depth;
 			SetGpuPageSize(GSVector2i(127, 127));
 			break;
 
-		case Format::Invalid:
+		default:
 			ASSERT(0);
 	}
 
-	// Create a gl object (texture isn't allocated here)
+  // Create a gl object (texture isn't allocated here)
 	glCreateTextures(GL_TEXTURE_2D, 1, &m_texture_id);
-	if (m_format == Format::UNorm8)
+	if (m_format == GL_R8)
 	{
 		// Emulate DX behavior, beside it avoid special code in shader to differentiate
 		// palette texture from a GL_RGBA target or a GL_R texture.
@@ -327,7 +371,7 @@ GSTextureOGL::GSTextureOGL(Type type, int w, int h, Format format, GLuint fbo_re
 		throw std::bad_alloc();
 	}
 
-	glTextureStorage2D(m_texture_id, m_max_layer + GL_TEX_LEVEL_0, gl_fmt, m_size.x, m_size.y);
+	glTextureStorage2D(m_texture_id, m_max_layer + GL_TEX_LEVEL_0, m_format, m_size.x, m_size.y);
 }
 
 GSTextureOGL::~GSTextureOGL()
@@ -338,15 +382,23 @@ GSTextureOGL::~GSTextureOGL()
 		GLState::rt = 0;
 	if (m_texture_id == GLState::ds)
 		GLState::ds = 0;
-	for (GLuint& tex : GLState::tex_unit)
+	for (size_t i = 0; i < countof(GLState::tex_unit); i++)
 	{
-		if (m_texture_id == tex)
-			tex = 0;
+		if (m_texture_id == GLState::tex_unit[i])
+			GLState::tex_unit[i] = 0;
 	}
 
 	glDeleteTextures(1, &m_texture_id);
 
 	GLState::available_vram += m_mem_usage;
+
+	if (m_local_buffer)
+		_aligned_free(m_local_buffer);
+}
+
+void* GSTextureOGL::GetNativeHandle() const
+{
+	return reinterpret_cast<void*>(static_cast<uintptr_t>(m_texture_id));
 }
 
 void GSTextureOGL::Clear(const void* data)
@@ -361,7 +413,7 @@ void GSTextureOGL::Clear(const void* data, const GSVector4i& area)
 
 bool GSTextureOGL::Update(const GSVector4i& r, const void* data, int pitch, int layer)
 {
-	ASSERT(m_type != Type::DepthStencil && m_type != Type::Offscreen);
+	ASSERT(m_type != GSTexture::DepthStencil && m_type != GSTexture::Offscreen);
 
 	if (layer >= m_max_layer)
 		return true;
@@ -374,8 +426,8 @@ bool GSTextureOGL::Update(const GSVector4i& r, const void* data, int pitch, int 
 
 	m_clean = false;
 
-	u32 row_byte = r.width() << m_int_shift;
-	u32 map_size = r.height() * row_byte;
+	uint32 row_byte = r.width() << m_int_shift;
+	uint32 map_size = r.height() * row_byte;
 #ifdef ENABLE_OGL_DEBUG_MEM_BW
 	g_real_texture_upload_byte += map_size;
 #endif
@@ -390,6 +442,7 @@ bool GSTextureOGL::Update(const GSVector4i& r, const void* data, int pitch, int 
 #endif
 
 	GL_PUSH("Upload Texture %d", m_texture_id);
+	g_perfmon.Put(GSPerfMon::TextureUploads, 1);
 
 	// The easy solution without PBO
 #if 0
@@ -403,26 +456,35 @@ bool GSTextureOGL::Update(const GSVector4i& r, const void* data, int pitch, int 
 
 	// The complex solution with PBO
 #if 1
-	char* src = (char*)data;
-	char* map = PboPool::Map(map_size);
-
-	// PERF: slow path of the texture upload. Dunno if we could do better maybe check if TC can keep row_byte == pitch
-	// Note: row_byte != pitch
-	for (int h = 0; h < r.height(); h++)
+	if (!GLLoader::buggy_pbo)
 	{
-		memcpy(map, src, row_byte);
-		map += row_byte;
-		src += pitch;
+		char* src = (char*)data;
+		char* map = PboPool::Map(map_size);
+
+		// PERF: slow path of the texture upload. Dunno if we could do better maybe check if TC can keep row_byte == pitch
+		// Note: row_byte != pitch
+		for (int h = 0; h < r.height(); h++)
+		{
+			memcpy(map, src, row_byte);
+			map += row_byte;
+			src += pitch;
+		}
+
+		PboPool::Unmap();
+
+		glTextureSubImage2D(m_texture_id, layer, r.x, r.y, r.width(), r.height(), m_int_format, m_int_type, (const void*)PboPool::Offset());
+
+		// FIXME OGL4: investigate, only 1 unpack buffer always bound
+		PboPool::UnbindPbo();
+
+		PboPool::EndTransfer();
 	}
-
-	PboPool::Unmap();
-
-	glTextureSubImage2D(m_texture_id, layer, r.x, r.y, r.width(), r.height(), m_int_format, m_int_type, (const void*)PboPool::Offset());
-
-	// FIXME OGL4: investigate, only 1 unpack buffer always bound
-	PboPool::UnbindPbo();
-
-	PboPool::EndTransfer();
+	else
+	{
+		glPixelStorei(GL_UNPACK_ROW_LENGTH, pitch >> m_int_shift);
+		glTextureSubImage2D(m_texture_id, layer, r.x, r.y, r.width(), r.height(), m_int_format, m_int_type, data);
+		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+	}
 #endif
 
 	m_generate_mipmap = true;
@@ -440,18 +502,53 @@ bool GSTextureOGL::Map(GSMap& m, const GSVector4i* _r, int layer)
 	ASSERT(r.width() != 0);
 	ASSERT(r.height() != 0);
 
-	u32 row_byte = r.width() << m_int_shift;
+	uint32 row_byte = r.width() << m_int_shift;
 	m.pitch = row_byte;
 
-	if (m_type == Type::Texture || m_type == Type::RenderTarget)
+	if (m_type == GSTexture::Offscreen)
 	{
+		g_perfmon.Put(GSPerfMon::Readbacks, 1);
+
+		// The fastest way will be to use a PBO to read the data asynchronously. Unfortunately GS
+		// architecture is waiting the data right now.
+
+#ifdef GL_EXT_TEX_SUB_IMAGE
+		// Maybe it is as good as the code below. I don't know
+		// With openGL 4.5 you can use glGetTextureSubImage
+
+		glGetTextureSubImage(m_texture_id, GL_TEX_LEVEL_0, r.x, r.y, 0, r.width(), r.height(), 1, m_int_format, m_int_type, m_size.x * m_size.y * 4, m_local_buffer);
+#else
+
+		// Bind the texture to the read framebuffer to avoid any disturbance
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fbo_read);
+		glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_texture_id, 0);
+
+		// In case a target is 16 bits (GT4)
+		glPixelStorei(GL_PACK_ALIGNMENT, 1u << m_int_shift);
+
+		glReadPixels(r.x, r.y, r.width(), r.height(), m_int_format, m_int_type, m_local_buffer);
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+
+#endif
+
+		m.bits = m_local_buffer;
+
+		return true;
+	}
+	else if (m_type == GSTexture::Texture || m_type == GSTexture::RenderTarget)
+	{
+		if (GLLoader::buggy_pbo)
+			return false;
+
 		GL_PUSH_("Upload Texture %d", m_texture_id); // POP is in Unmap
+		g_perfmon.Put(GSPerfMon::TextureUploads, 1);
 
 		m_clean = false;
 
-		u32 map_size = r.height() * row_byte;
+		uint32 map_size = r.height() * row_byte;
 
-		m.bits = (u8*)PboPool::Map(map_size);
+		m.bits = (uint8*)PboPool::Map(map_size);
 
 #ifdef ENABLE_OGL_DEBUG_MEM_BW
 		g_real_texture_upload_byte += map_size;
@@ -472,7 +569,7 @@ bool GSTextureOGL::Map(GSMap& m, const GSVector4i* _r, int layer)
 
 void GSTextureOGL::Unmap()
 {
-	if (m_type == Type::Texture || m_type == Type::RenderTarget)
+	if (m_type == GSTexture::Texture || m_type == GSTexture::RenderTarget)
 	{
 
 		PboPool::Unmap();
@@ -537,53 +634,19 @@ void GSTextureOGL::CommitPages(const GSVector2i& region, bool commit)
 	GLState::available_vram -= m_mem_usage;
 }
 
-GSTexture::GSMap GSTextureOGL::Read(const GSVector4i& r, AlignedBuffer<u8, 32>& buffer)
-{
-	GSMap m;
-	m.pitch = r.width() << m_int_shift;
-	buffer.MakeRoomFor(m.pitch * r.height());
-	m.bits = buffer.GetPtr();
-
-	// The fastest way will be to use a PBO to read the data asynchronously. Unfortunately GSdx
-	// architecture is waiting the data right now.
-#if 0
-	// Maybe it is as good as the code below. I don't know
-	// With openGL 4.5 you can use glGetTextureSubImage
-
-	glGetTextureSubImage(m_texture_id, GL_TEX_LEVEL_0, r.x, r.y, 0, r.width(), r.height(), 1, m_int_format, m_int_type, m_size.x * m_size.y * 4, m.bits);
-#else
-	// Bind the texture to the read framebuffer to avoid any disturbance
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fbo_read);
-	glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_texture_id, 0);
-
-	// In case a target is 16 bits (GT4)
-	glPixelStorei(GL_PACK_ALIGNMENT, 1u << m_int_shift);
-
-	glReadPixels(r.x, r.y, r.width(), r.height(), m_int_format, m_int_type, m.bits);
-
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-#endif
-
-	return m;
-}
-
 bool GSTextureOGL::Save(const std::string& fn)
 {
 	// Collect the texture data
-	u32 pitch = 4 * m_committed_size.x;
-	u32 buf_size = pitch * m_committed_size.y * 2; // Note *2 for security (depth/stencil)
-	std::unique_ptr<u8[]> image(new u8[buf_size]);
+	uint32 pitch = 4 * m_committed_size.x;
+	uint32 buf_size = pitch * m_committed_size.y * 2; // Note *2 for security (depth/stencil)
+	std::unique_ptr<uint8[]> image(new uint8[buf_size]);
 #ifdef ENABLE_OGL_DEBUG
 	GSPng::Format fmt = GSPng::RGB_A_PNG;
 #else
 	GSPng::Format fmt = GSPng::RGB_PNG;
 #endif
 
-	if (IsBackbuffer())
-	{
-		glReadPixels(0, 0, m_committed_size.x, m_committed_size.y, GL_RGBA, GL_UNSIGNED_BYTE, image.get());
-	}
-	else if (IsDss())
+	if (IsDepth())
 	{
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, m_fbo_read);
 
@@ -594,7 +657,7 @@ bool GSTextureOGL::Save(const std::string& fn)
 
 		fmt = GSPng::RGB_A_PNG;
 	}
-	else if (m_format == Format::Int32)
+	else if (m_format == GL_R32I)
 	{
 		// Note: 4.5 function used for accurate DATE
 		// barely used outside of dev and not sparse anyway
@@ -608,16 +671,16 @@ bool GSTextureOGL::Save(const std::string& fn)
 
 		glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_texture_id, 0);
 
-		if (m_format == Format::Color)
+		if (m_format == GL_RGBA8)
 		{
 			glReadPixels(0, 0, m_committed_size.x, m_committed_size.y, GL_RGBA, GL_UNSIGNED_BYTE, image.get());
 		}
-		else if (m_format == Format::UInt16)
+		else if (m_format == GL_R16UI)
 		{
 			glReadPixels(0, 0, m_committed_size.x, m_committed_size.y, GL_RED_INTEGER, GL_UNSIGNED_SHORT, image.get());
 			fmt = GSPng::R16I_PNG;
 		}
-		else if (m_format == Format::UNorm8)
+		else if (m_format == GL_R8)
 		{
 			fmt = GSPng::R8I_PNG;
 			glReadPixels(0, 0, m_committed_size.x, m_committed_size.y, GL_RED, GL_UNSIGNED_BYTE, image.get());
@@ -630,7 +693,7 @@ bool GSTextureOGL::Save(const std::string& fn)
 	return GSPng::Save(fmt, fn, image.get(), m_committed_size.x, m_committed_size.y, pitch, compression);
 }
 
-u32 GSTextureOGL::GetMemUsage()
+uint32 GSTextureOGL::GetMemUsage()
 {
 	return m_mem_usage;
 }

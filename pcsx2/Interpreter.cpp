@@ -20,10 +20,11 @@
 #include "R5900OpcodeTables.h"
 #include "R5900Exceptions.h"
 #include "System/SysThreads.h"
+#include "VMManager.h"
 
 #include "Elfheader.h"
 
-#include "DebugTools/Breakpoints.h"
+//#include "DebugTools/Breakpoints.h"
 
 #include <float.h>
 
@@ -48,6 +49,7 @@ static void debugI()
 
 void intBreakpoint(bool memcheck)
 {
+#if 0
 	u32 pc = cpuRegs.pc;
  	if (CBreakPoints::CheckSkipFirst(BREAKPOINT_EE, pc) != 0)
 		return;
@@ -60,12 +62,16 @@ void intBreakpoint(bool memcheck)
 	}
 
 	CBreakPoints::SetBreakpointTriggered(true);
+#endif
+#ifndef PCSX2_CORE
 	GetCoreThread().PauseSelfDebug();
+#endif
 	throw Exception::ExitCpuExecute();
 }
 
 void intMemcheck(u32 op, u32 bits, bool store)
 {
+#if 0
 	// compute accessed address
 	u32 start = cpuRegs.GPR.r[(op >> 21) & 0x1F].UD[0];
 	if ((s16)op != 0)
@@ -93,6 +99,7 @@ void intMemcheck(u32 op, u32 bits, bool store)
 		if (start < check.end && check.start < end)
 			intBreakpoint(true);
 	}
+#endif
 }
 
 void intCheckMemcheck()
@@ -167,20 +174,24 @@ static void execI()
 	}
 #endif
 
-#if 0
+#if 1
 	static long int print_me = 0;
 	// Based on cycle
-	// if( cpuRegs.cycle > 0x4f24d714 )
-	// Or dump from a particular PC (useful to debug handler/syscall)
-	if (pc == 0x80000000) {
-		print_me = 2000;
+	if (cpuRegs.pc == 0x9FC43120) {
+		// Or dump from a particular PC (useful to debug handler/syscall)
+		// if (pc == 0x80000000) {
+		print_me = 200000;
 	}
 	if (print_me) {
 		print_me--;
 		disOut.clear();
 		disR5900Fasm(disOut, cpuRegs.code, pc);
-		CPU_LOG( disOut.c_str() );
+		BIOS_LOG(disOut.c_str());
 	}
+#endif
+#if 0
+	if (cpuRegs.cycle == 0xb1542b78 && cpuRegs.pc == 0x001aee74)
+		__builtin_trap();
 #endif
 
 
@@ -582,8 +593,13 @@ static void intExecute()
 
 static void intCheckExecutionState()
 {
+#ifndef PCSX2_CORE
 	if( GetCoreThread().HasPendingStateChangeRequest() )
 		throw Exception::ExitCpuExecute();
+#else
+	if (VMManager::Internal::IsExecutionInterrupted())
+		throw Exception::ExitCpuExecute();
+#endif
 }
 
 static void intStep()

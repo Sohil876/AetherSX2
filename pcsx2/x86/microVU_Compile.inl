@@ -449,6 +449,9 @@ void mVUdebugPrintBlocks(microVU& mVU, bool isEndPC)
 		mVUbackupRegs(mVU, true);
 		if (isEndPC) xFastCall(mVUprintPC2, xPC);
 		else         xFastCall(mVUprintPC1, xPC);
+
+		if (!isEndPC) xFastCall(DumpVUState, mVU.index, xPC);
+
 		mVUrestoreRegs(mVU, true);
 	}
 }
@@ -596,18 +599,6 @@ void* mVUcompileSingleInstruction(microVU& mVU, u32 startPC, uptr pState, microF
 		mVUopL(mVU, 0);
 		incPC(1);
 	}
-
-	if (!mVUlow.isKick)
-	{
-		mVUlow.kickcycles = 1 + mVUstall;
-		mVUregs.xgkickcycles = 0;
-	}
-	else
-	{
-		mVUregs.xgkickcycles = 0;
-		mVUlow.kickcycles = 0;
-	}
-
 	mVUsetCycles(mVU);
 	mVUinfo.readQ = mVU.q;
 	mVUinfo.writeQ = !mVU.q;
@@ -632,18 +623,11 @@ void* mVUcompileSingleInstruction(microVU& mVU, u32 startPC, uptr pState, microF
 	}
 	mVUexecuteInstruction(mVU);
 
-	if (isVU1 && mVUlow.kickcycles && CHECK_XGKICKHACK)
-	{
-		mVU_XGKICK_SYNC(mVU, false);
-	}
-
 	mVUincCycles(mVU, 1); //Just incase the is XGKick
 	if (mVUinfo.doXGKICK)
 	{
 		mVU_XGKICK_DELAY(mVU);
 	}
-
-	mVUregs.xgkickcycles = 0;
 
 	return thisPtr;
 }
@@ -788,11 +772,8 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 			}
 
 			branchWarning(mVU);
-			if (mVUregs.xgkickcycles)
-			{
-				mVUlow.kickcycles = mVUregs.xgkickcycles;
-				mVUregs.xgkickcycles = 0;
-			}
+			mVUlow.kickcycles = mVUregs.xgkickcycles;
+			mVUregs.xgkickcycles = 0;
 			break;
 		}
 		else if (branch == 1)
@@ -811,21 +792,15 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 		if (mVUup.mBit && !branch && !mVUup.eBit)
 		{
 			mVUregs.needExactMatch |= 7;
-			if (mVUregs.xgkickcycles)
-			{
-				mVUlow.kickcycles = mVUregs.xgkickcycles;
-				mVUregs.xgkickcycles = 0;
-			}
+			mVUlow.kickcycles = mVUregs.xgkickcycles;
+			mVUregs.xgkickcycles = 0;
 			break;
 		}
 
 		if (mVUinfo.isEOB)
 		{
-			if (mVUregs.xgkickcycles)
-			{
-				mVUlow.kickcycles = mVUregs.xgkickcycles;
-				mVUregs.xgkickcycles = 0;
-			}
+			mVUlow.kickcycles = mVUregs.xgkickcycles;
+			mVUregs.xgkickcycles = 0;
 			break;
 		}
 
@@ -849,6 +824,17 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 
 	for (; x < endCount; x++)
 	{
+#if 0
+		if (x == 0 || true)
+		{
+			mVU.regAlloc->flushAll(false);
+			mVUbackupRegs(mVU, true);
+			xFastCall(DumpVUState, mVU.index, (xPC) | ((x == 0) ? 0x80000000 : 0));
+			mVUrestoreRegs(mVU, true);
+			//if (xPC == 0x1358) __debugbreak();
+		}
+#endif
+
 		if (mVUinfo.isEOB)
 		{
 			handleBadOp(mVU, x);

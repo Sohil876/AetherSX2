@@ -52,6 +52,9 @@
 #elif defined(PTW32_ARCHx86)
 #  define PTW32_ARCH "x86"
 #endif
+#if defined(PTW32_ARCHarm64)
+#  define PTW32_ARCH "arm64"
+#endif
 
 #if defined(PTW32_RC_MSC)
 #  if defined(__CLEANUP_C)

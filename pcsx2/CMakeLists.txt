@@ -3,7 +3,22 @@ include(macros/GlibCompileResourcesSupport)
 # All flags, libraries, etc, that are shared between PCSX2 compilation files
 add_library(PCSX2_FLAGS INTERFACE)
 
-add_executable(PCSX2)
+if(ANDROID)
+	add_library(PCSX2 SHARED)
+	set_target_properties(PCSX2 PROPERTIES OUTPUT_NAME "emucore")
+	target_compile_definitions(PCSX2_FLAGS INTERFACE
+		"PCSX2_CORE=1"
+		"DISABLE_RECORDING"
+	)
+elseif (NOT PCSX2_CORE)
+	add_executable(PCSX2)
+else()
+	add_library(PCSX2)
+	target_compile_definitions(PCSX2_FLAGS INTERFACE
+		"PCSX2_CORE=1"
+		"DISABLE_RECORDING"
+	)
+endif()
 target_link_libraries(PCSX2 PRIVATE PCSX2_FLAGS)
 
 target_compile_features(PCSX2_FLAGS INTERFACE cxx_std_17)
@@ -74,6 +89,10 @@ if(WAYLAND_CLIENT_FOUND)
 	target_compile_definitions(PCSX2 PRIVATE WAYLAND_BUILD)
 endif()
 
+if(NOT WIN32)
+	target_link_libraries(PCSX2_FLAGS INTERFACE cpuinfo)
+endif()
+
 if(WIN32)
 	# Resources
 	target_sources(PCSX2 PRIVATE
@@ -130,7 +149,6 @@ set(pcsx2Sources
 	IopIrq.cpp
 	IopMem.cpp
 	IopSio2.cpp
-	IPC.cpp
 	Mdec.cpp
 	Memory.cpp
 	MemoryCardFile.cpp
@@ -139,6 +157,7 @@ set(pcsx2Sources
 	MTGS.cpp
 	MTVU.cpp
 	MultipartFileReader.cpp
+	OutputIsoFile.cpp
 	Patch.cpp
 	Patch_Memory.cpp
 	Pcsx2Config.cpp
@@ -205,7 +224,6 @@ set(pcsx2Headers
 	IopHw.h
 	IopMem.h
 	IopSio2.h
-	IPC.h
 	Mdec.h
 	MTVU.h
 	Memory.h
@@ -214,7 +232,6 @@ set(pcsx2Headers
 	MemoryTypes.h
 	Patch.h
 	PathDefs.h
-	PCSX2Base.h
 	PerformanceMetrics.h
 	PrecompiledHeader.h
 	R3000A.h
@@ -237,6 +254,14 @@ set(pcsx2Headers
 	VUflags.h
 	VUmicro.h
 	VUops.h)
+
+set(pcsx2IPCSources
+	IPC.cpp
+)
+
+set(pcsx2IPCHeaders
+	IPC.h
+)
 
 # CDVD sources
 set(pcsx2CDVDSources
@@ -302,10 +327,17 @@ set(pcsx2SPU2Sources
 	SPU2/spu2sys.cpp
 	SPU2/Timestretcher.cpp
 	SPU2/Wavedump_wav.cpp
+	SPU2/WavFile.cpp
 	)
 
 if(TARGET PkgConfig::PORTAUDIO)
 	list(APPEND pcsx2SPU2Sources SPU2/SndOut_Portaudio.cpp)
+endif()
+
+if(CUBEB_API)
+	list(APPEND pcsx2SPU2Sources SPU2/SndOut_Cubeb.cpp)
+	target_compile_definitions(PCSX2_FLAGS INTERFACE "SPU2X_CUBEB")
+	target_link_libraries(PCSX2_FLAGS INTERFACE cubeb)
 endif()
 
 # SPU2 headers
@@ -349,7 +381,6 @@ set(pcsx2DEV9Sources
 	DEV9/PacketReader/IP/IP_Packet.cpp
 	DEV9/PacketReader/EthernetFrame.cpp
 	DEV9/PacketReader/NetLib.cpp
-	DEV9/ConfigUI.cpp
 	DEV9/smap.cpp
 	DEV9/DEV9.cpp
 	DEV9/DEV9Config.cpp
@@ -384,6 +415,12 @@ set(pcsx2DEV9Headers
 	DEV9/SimpleQueue.h
 	DEV9/smap.h
 	)
+
+if(NOT PCSX2_CORE)
+	list(APPEND pcsx2DEV9Sources
+		DEV9/ConfigUI.cpp
+	)
+endif()
 
 # USBNull
 set(pcsx2USBNullSources USB/USBNull.cpp)
@@ -471,7 +508,7 @@ if(TARGET PulseAudio::PulseAudio)
 	list(APPEND pcsx2USBHeaders USB/usb-mic/audiodev-pulse.h)
 endif()
 
-if(WIN32)
+if(WIN32 AND NOT PCSX2_CORE)
 	set(pcsx2PADSources
 		PAD/Windows/PADConfig.cpp
 		PAD/Windows/DeviceEnumerator.cpp
@@ -493,7 +530,7 @@ if(WIN32)
 	)
 
 	set(pcsx2PADHeaders
-		PAD/Gamepad.h
+		PAD/Windows/PAD.h
 		PAD/Windows/PADConfig.h
 		PAD/Windows/DeviceEnumerator.h
 		PAD/Windows/Diagnostics.h
@@ -514,7 +551,7 @@ if(WIN32)
 		PAD/Windows/WndProcEater.h
 		PAD/Windows/XInputEnum.h
 	)
-else(WIN32)
+elseif(NOT PCSX2_CORE)
 	# PAD resources pre-compilation
 	set(PADImgHeader "${CMAKE_BINARY_DIR}/pcsx2/PAD/Linux/ImgHeader")
 	set(PADImg "${CMAKE_SOURCE_DIR}/pcsx2/PAD/Linux/Img")
@@ -558,12 +595,12 @@ else(WIN32)
 		PAD/Linux/wx_dialog/GamepadConfiguration.cpp
 		PAD/Linux/wx_dialog/JoystickConfiguration.cpp
 		PAD/Linux/Config.cpp
+		PAD/Linux/linux.cpp
 		${CMAKE_BINARY_DIR}/pcsx2/PAD/Linux/resources_pad.cpp
 	)
 
 	# PAD/Linux headers
 	set(pcsx2PADHeaders
-		PAD/Gamepad.h
 		PAD/Linux/bitwise.h
 		PAD/Linux/Config.h
 		PAD/Linux/Device.h
@@ -572,6 +609,7 @@ else(WIN32)
 		PAD/Linux/SDL/joystick.h
 		PAD/Linux/keyboard.h
 		PAD/Linux/KeyStatus.h
+		PAD/Linux/PAD.h
 		PAD/Linux/state_management.h
 		PAD/Linux/wx_dialog/opPanel.h
 		PAD/Linux/wx_dialog/GamepadConfiguration.h
@@ -602,7 +640,28 @@ else(WIN32)
 		${PADImgHeader}/arrow_left.h
 		${PADImgHeader}/arrow_right.h
 	)
-endif(WIN32)
+else()
+	# Host PAD
+	set(pcsx2PADSources
+		PAD/Host/Device.cpp
+		PAD/Host/InputManager.cpp
+		PAD/Host/KeyStatus.cpp
+		PAD/Host/PAD.cpp
+		PAD/Host/SDLJoystick.cpp
+		PAD/Host/StateManagement.cpp
+	)
+	set(pcsx2PADHeaders
+		PAD/Host/bitwise.h
+		PAD/Host/Config.h
+		PAD/Host/Device.h
+		PAD/Host/Global.h
+		PAD/Host/InputManager.h
+		PAD/Host/KeyStatus.h
+		PAD/Host/PAD.h
+		PAD/Host/SDLJoystick.h
+		PAD/Host/StateManagement.h
+	)
+endif()
 
 # GS sources
 set(pcsx2GSSources
@@ -627,7 +686,6 @@ set(pcsx2GSSources
 	GS/Renderers/Common/GSDevice.cpp
 	GS/Renderers/Common/GSDirtyRect.cpp
 	GS/Renderers/Common/GSFunctionMap.cpp
-	GS/Renderers/Common/GSOsdManager.cpp
 	GS/Renderers/Common/GSRenderer.cpp
 	GS/Renderers/Common/GSTexture.cpp
 	GS/Renderers/Common/GSVertexTrace.cpp
@@ -639,12 +697,9 @@ set(pcsx2GSSources
 	GS/Renderers/HW/GSTextureCache.cpp
 	GS/Renderers/SW/GSDrawScanline.cpp
 	GS/Renderers/SW/GSDrawScanlineCodeGenerator.cpp
-	GS/Renderers/SW/GSDrawScanlineCodeGenerator.all.cpp
-	GS/Renderers/SW/GSNewCodeGenerator.cpp
 	GS/Renderers/SW/GSRasterizer.cpp
 	GS/Renderers/SW/GSRendererSW.cpp
 	GS/Renderers/SW/GSSetupPrimCodeGenerator.cpp
-	GS/Renderers/SW/GSSetupPrimCodeGenerator.all.cpp
 	GS/Renderers/SW/GSTextureCacheSW.cpp
 	GS/Renderers/SW/GSTextureSW.cpp
 	GS/Renderers/OpenGL/GLLoader.cpp
@@ -652,9 +707,15 @@ set(pcsx2GSSources
 	GS/Renderers/OpenGL/GSDeviceOGL.cpp
 	GS/Renderers/OpenGL/GSRendererOGL.cpp
 	GS/Renderers/OpenGL/GSShaderOGL.cpp
+	GS/Renderers/OpenGL/GSTextureCacheOGL.cpp
 	GS/Renderers/OpenGL/GSTextureOGL.cpp
 	GS/Window/GSSetting.cpp
-	GS/Window/GSwxDialog.cpp
+	)
+
+set(pcsx2GSx86Sources
+	GS/Renderers/SW/GSDrawScanlineCodeGenerator.all.cpp
+	GS/Renderers/SW/GSNewCodeGenerator.cpp
+	GS/Renderers/SW/GSSetupPrimCodeGenerator.all.cpp
 	)
 
 # GS headers
@@ -669,10 +730,7 @@ set(pcsx2GSHeaders
 	GS/GSDrawingContext.h
 	GS/GSDrawingEnvironment.h
 	GS/GSDump.h
-	GS/GSExtra.h
-	GS/GSGL.h
-	GS/GSIntrin.h
-	GS/GSRegs.h
+	GS/GS_types.h
 	GS/GS.h
 	GS/GSLocalMemory.h
 	GS/GSLzma.h
@@ -693,7 +751,6 @@ set(pcsx2GSHeaders
 	GS/Renderers/Common/GSDirtyRect.h
 	GS/Renderers/Common/GSFastList.h
 	GS/Renderers/Common/GSFunctionMap.h
-	GS/Renderers/Common/GSOsdManager.h
 	GS/Renderers/Common/GSRenderer.h
 	GS/Renderers/Common/GSTexture.h
 	GS/Renderers/Common/GSVertex.h
@@ -722,13 +779,22 @@ set(pcsx2GSHeaders
 	GS/Renderers/OpenGL/GSDeviceOGL.h
 	GS/Renderers/OpenGL/GSRendererOGL.h
 	GS/Renderers/OpenGL/GSShaderOGL.h
+	GS/Renderers/OpenGL/GSTextureCacheOGL.h
 	GS/Renderers/OpenGL/GSTextureOGL.h
 	GS/Renderers/OpenGL/GSUniformBufferOGL.h
 	GS/Window/GSCaptureDlg.h
 	GS/Window/GSDialog.h
 	GS/Window/GSSetting.h
-	GS/Window/GSwxDialog.h
 	)
+
+if(NOT PCSX2_CORE)
+	list(APPEND pcsx2GSSources
+		GS/Window/GSwxDialog.cpp
+	)
+	list(APPEND pcsx2GSHeaders
+		GS/Window/GSwxDialog.h
+	)
+endif()
 
 if(WIN32)
 	list(APPEND pcsx2SPU2Sources
@@ -796,6 +862,7 @@ if(WIN32)
 		GS/Renderers/DX11/GSDevice11.cpp
 		GS/Renderers/DX11/GSRendererDX11.cpp
 		GS/Renderers/DX11/GSTexture11.cpp
+		GS/Renderers/DX11/GSTextureCache11.cpp
 		GS/Renderers/DX11/GSTextureFX11.cpp
 		GS/Window/GSCaptureDlg.cpp
 		GS/Window/GSDialog.cpp
@@ -805,31 +872,32 @@ if(WIN32)
 		GS/Renderers/DX11/GSDevice11.h
 		GS/Renderers/DX11/GSRendererDX11.h
 		GS/Renderers/DX11/GSTexture11.h
+		GS/Renderers/DX11/GSTextureCache11.h
 	)
-else(WIN32)
-	list(APPEND pcsx2SPU2Sources
+elseif(NOT PCSX2_CORE)
+	list(APPEND pcsx2SPU2Headers
 		SPU2/Linux/CfgHelpers.cpp
 		SPU2/Linux/Config.cpp
 		SPU2/Linux/ConfigDebug.cpp
 		SPU2/Linux/ConfigSoundTouch.cpp
 		SPU2/Linux/Dialogs.cpp
-		SPU2/WavFile.cpp
-		SPU2/wx/wxConfig.cpp
 	)
 	list(APPEND pcsx2SPU2Headers
 		SPU2/Linux/Config.h
 		SPU2/Linux/Dialogs.h
-		SPU2/wx/wxConfig.h
 	)
-
 	list(APPEND pcsx2DEV9Sources
 		DEV9/Linux/Config.cpp
 	)
 
+	list(APPEND pcsx2SPU2Sources
+		SPU2/wx/wxConfig.cpp
+	)
+	list(APPEND pcsx2SPU2Headers
+		SPU2/wx/wxConfig.h
+	)
+
 	list(APPEND pcsx2USBSources
-		USB/icon_buzz_24.cpp
-		USB/linux/config-gtk.cpp
-		USB/linux/config.cpp
 		USB/linux/util.cpp
 		USB/qemu-usb/input-keymap-linux-to-qcode.cpp
 		USB/usb-eyetoy/api_init_linux.cpp
@@ -845,10 +913,7 @@ else(WIN32)
 		USB/usb-pad/evdev/shared-gtk.cpp
 	)
 	list(APPEND pcsx2USBHeaders
-		USB/gtk.h
-		USB/icon_buzz_24.h
 		USB/linux/actualfile.h
-		USB/linux/config.h
 		USB/linux/ini.h
 		USB/linux/util.h
 		USB/qemu-usb/input-keymap-linux-to-qcode.h
@@ -859,7 +924,33 @@ else(WIN32)
 		USB/usb-pad/evdev/evdev.h
 		USB/usb-pad/evdev/shared.h
 	)
-endif(WIN32)
+
+	list(APPEND pcsx2USBSources
+		USB/icon_buzz_24.cpp
+		USB/linux/config-gtk.cpp
+		USB/linux/config.cpp
+	)
+	list(APPEND pcsx2USBHeaders
+		USB/gtk.h
+		USB/icon_buzz_24.h
+		USB/linux/config.h
+	)
+else()
+	list(APPEND pcsx2SPU2Headers
+		SPU2/Host/CfgHelpers.cpp
+		SPU2/Host/Config.cpp
+		SPU2/Host/ConfigDebug.cpp
+		SPU2/Host/ConfigSoundTouch.cpp
+		SPU2/Host/Dialogs.cpp		
+	)
+	list(APPEND pcsx2SPU2Headers
+		SPU2/Host/Config.h
+		SPU2/Host/Dialogs.h
+	)
+	list(APPEND pcsx2DEV9Sources
+		DEV9/Linux/Config.cpp
+	)
+endif()
 
 
 # DebugTools sources
@@ -871,7 +962,6 @@ set(pcsx2DebugToolsSources
 	DebugTools/MipsAssembler.cpp
 	DebugTools/MipsAssemblerTables.cpp
 	DebugTools/MipsStackWalk.cpp
-	DebugTools/Breakpoints.cpp
 	DebugTools/SymbolMap.cpp
 	DebugTools/DisR3000A.cpp
 	DebugTools/DisR5900asm.cpp
@@ -888,13 +978,47 @@ set(pcsx2DebugToolsHeaders
 	DebugTools/MipsAssembler.h
 	DebugTools/MipsAssemblerTables.h
 	DebugTools/MipsStackWalk.h
-	DebugTools/Breakpoints.h
 	DebugTools/SymbolMap.h
 	DebugTools/Debug.h
 	DebugTools/DisASM.h
 	DebugTools/DisVUmicro.h
 	DebugTools/DisVUops.h
 	DebugTools/BiosDebugData.h)
+
+# Frontend sources
+set(pcsx2FrontendSources
+	Frontend/ImGuiManager.cpp
+	Frontend/ImGuiManager.cpp
+	Frontend/imgui_impl_vulkan.cpp
+	Frontend/OpenGLHostDisplay.cpp
+	Frontend/VulkanHostDisplay.cpp
+	HostDisplay.cpp
+	HostSettings.cpp
+)
+
+# Frontend headers
+set(pcsx2FrontendHeaders
+	Frontend/ImGuiManager.h
+	Frontend/imgui_impl_vulkan.h
+	Frontend/OpenGLHostDisplay.h
+	Frontend/VulkanHostDisplay.h
+	HostDisplay.h
+)
+
+if(PCSX2_CORE)
+	list(APPEND pcsx2FrontendSources
+		Frontend/GameList.cpp
+		Frontend/INISettingsInterface.cpp
+		Frontend/LayeredSettingsInterface.cpp
+		VMManager.cpp
+	)
+	list(APPEND pcsx2FrontendHeaders
+		Frontend/GameList.h
+		Frontend/INISettingsInterface.h
+		Frontend/LayeredSettingsInterface.h
+		VMManager.h)
+endif()
+
 
 # gui sources
 set(pcsx2GuiSources
@@ -976,6 +1100,7 @@ set(pcsx2GuiHeaders
 	gui/AppConfig.h
 	gui/AppCoreThread.h
 	gui/AppEventListeners.h
+	gui/AppHost.h
 	gui/AppForwardDefs.h
 	gui/App.h
 	gui/ApplyState.h
@@ -1043,46 +1168,47 @@ set(pcsx2GuiResources
 set(pcsx2IPUSources
 	IPU/IPU.cpp
 	IPU/IPU_Fifo.cpp
-	IPU/IPUdither.cpp
-	IPU/IPUdma.cpp
-	IPU/mpeg2lib/Idct.cpp
-	IPU/mpeg2lib/Mpeg.cpp
-	IPU/yuv2rgb.cpp)
+	IPU/IPUdma.cpp)
 
 # IPU headers
 set(pcsx2IPUHeaders
 	IPU/IPUdma.h
 	IPU/IPU_Fifo.h
 	IPU/IPU.h
-	IPU/mpeg2lib/Mpeg.h
-	IPU/mpeg2lib/Vlc.h
-	IPU/yuv2rgb.h
 	)
 
 # Linux sources
 set(pcsx2LinuxSources
 	CDVD/Linux/DriveUtility.cpp
 	CDVD/Linux/IOCtlSrc.cpp
-	Linux/LnxConsolePipe.cpp
-	Linux/LnxKeyCodes.cpp
 	Linux/LnxFlatFileReader.cpp
 	)
 
 set(pcsx2OSXSources
 	CDVD/Linux/DriveUtility.cpp
 	CDVD/Linux/IOCtlSrc.cpp
-	Linux/LnxConsolePipe.cpp
-#	Linux/LnxKeyCodes.cpp
 	Darwin/DarwinFlatFileReader.cpp
 	)
 
 set(pcsx2FreeBSDSources
 	CDVD/Linux/DriveUtility.cpp
 	CDVD/Linux/IOCtlSrc.cpp
-	Linux/LnxConsolePipe.cpp
-	Linux/LnxKeyCodes.cpp
 	Darwin/DarwinFlatFileReader.cpp
 	)
+
+if(NOT PCSX2_CORE)
+	list(APPEND pcsx2LinuxSources
+		Linux/LnxConsolePipe.cpp
+		Linux/LnxKeyCodes.cpp
+	)
+	list(APPEND pcsx2OSXSources
+		Linux/LnxConsolePipe.cpp
+	)
+	list(APPEND pcsx2FreeBSDSources
+		Linux/LnxConsolePipe.cpp
+		Linux/LnxKeyCodes.cpp
+	)
+endif()
 
 # Linux headers
 set(pcsx2LinuxHeaders
@@ -1181,8 +1307,12 @@ set(pcsx2RecordingVirtualPadResources
 
 # System sources
 set(pcsx2SystemSources
-	System/SysCoreThread.cpp
 	System/SysThreadBase.cpp)
+if(NOT PCSX2_CORE)
+	list(APPEND pcsx2SystemSources
+		System/SysCoreThread.cpp
+	)
+endif()
 
 # System headers
 set(pcsx2SystemHeaders
@@ -1293,9 +1423,14 @@ set(pcsx2LTOSources
 	${pcsx2Headers}
 	${pcsx2IPUSources}
 	${pcsx2IPUHeaders}
-	${pcsx2x86Sources}
-	${pcsx2x86Headers}
 )
+
+if(${PCSX2_TARGET_ARCHITECTURES} STREQUAL "aarch64")
+	target_link_libraries(PCSX2_FLAGS INTERFACE vixl)
+else()
+	list(APPEND pcsx2LTOSources ${pcsx2x86Sources} ${pcsx2x86Headers})
+	list(APPEND pcsx2GSSources ${pcsx2GSx86Sources})
+endif()
 
 if(LTO_PCSX2_CORE)
 	add_library(PCSX2_LTO ${pcsx2LTOSources})
@@ -1320,27 +1455,41 @@ target_sources(PCSX2 PRIVATE
 	${pcsx2GSSources}
 	${pcsx2DebugToolsSources}
 	${pcsx2DebugToolsHeaders}
-	${pcsx2GuiSources}
-	${pcsx2GuiResources}
-	${pcsx2GuiHeaders}
 	${pcsx2ps2Sources}
 	${pcsx2ps2Headers}
-	${pcsx2RecordingSources}
-	${pcsx2RecordingVirtualPadResources}
-	${pcsx2RecordingHeaders}
 	${pcsx2SystemSources}
 	${pcsx2SystemHeaders}
 	${pcsx2UtilitiesSources}
 	${pcsx2UtilitiesHeaders})
 
+# gui sources when not doing a qt build
+if (NOT PCSX2_CORE)
+	target_sources(PCSX2 PRIVATE
+		${pcsx2GuiSources}
+		${pcsx2GuiResources}
+		${pcsx2GuiHeaders}
+		${pcsx2IPCSources}
+		${pcsx2IPCResources}
+		${pcsx2RecordingSources}
+		${pcsx2RecordingVirtualPadResources}
+		${pcsx2RecordingHeaders}
+	)
+endif()
+
 # platform sources
 # Linux
-if(Linux)
+if(ANDROID)
 	target_sources(PCSX2 PRIVATE
 		${pcsx2LinuxSources}
 		${pcsx2LinuxHeaders}
 		)
-
+elseif(Linux)
+	target_sources(PCSX2 PRIVATE
+		${pcsx2LinuxSources}
+		${pcsx2LinuxHeaders}
+		)
+endif()
+if(Linux AND NOT ANDROID)
 	target_link_libraries(PCSX2_FLAGS INTERFACE
 		PkgConfig::AIO
 		PkgConfig::LIBUDEV
@@ -1348,7 +1497,7 @@ if(Linux)
 	)
 endif()
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT ANDROID)
 	if(X11_API)
 		target_link_libraries(PCSX2_FLAGS INTERFACE
 			PkgConfig::X11_XCB
@@ -1371,16 +1520,22 @@ if(Windows)
 endif()
 
 # MacOSX/BSD
-if(UNIX AND NOT Linux)
+if(UNIX AND NOT Linux AND NOT ANDROID)
 	target_sources(PCSX2 PRIVATE
 		${pcsx2OSXSources}
 		${pcsx2LinuxHeaders}
-		${pcsx2USBNullSources}
-		${pcsx2USBNullHeaders})
-else()
+	)
+endif()
+
+# USB
+if(NOT APPLE AND NOT PCSX2_CORE)
 	target_sources(PCSX2 PRIVATE
 		${pcsx2USBSources}
 		${pcsx2USBHeaders})
+else()
+	target_sources(PCSX2 PRIVATE
+		${pcsx2USBNullSources}
+		${pcsx2USBNullHeaders})
 endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD" OR ${CMAKE_SYSTEM_NAME} MATCHES "NetBSD")
@@ -1392,15 +1547,16 @@ endif()
 target_link_libraries(PCSX2_FLAGS INTERFACE
 	common
 	glad
+	imgui
 	fmt::fmt
 	yaml-cpp
 	chdr-static
+	simpleini
 	wxWidgets::all
 	ZLIB::ZLIB
 	PkgConfig::SOUNDTOUCH
 	PkgConfig::SAMPLERATE
 	PNG::PNG
-	Freetype::Freetype
 	LibLZMA::LibLZMA
 	${LIBC_LIBRARIES}
 )
@@ -1426,16 +1582,21 @@ if(WIN32)
 		opengl32.lib
 		comsuppw.lib
 	)
-elseif(APPLE)
+elseif(ANDROID)
+	target_link_libraries(PCSX2 PRIVATE AetherSX2)
+	target_link_directories(PCSX2 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 	target_link_libraries(PCSX2_FLAGS INTERFACE
-		PkgConfig::GIO
-		PCAP::PCAP
-		LibXml2::LibXml2
+		libaio
+		oboe
+		android
 	)
 else()
-	target_link_libraries(PCSX2_FLAGS INTERFACE
-		GTK::gtk
-		HarfBuzz::HarfBuzz
+	if (NOT PCSX2_CORE)
+		target_link_libraries(PCSX2_FLAGS INTERFACE
+			GTK::gtk
+		)
+	endif()
+  target_link_libraries(PCSX2_FLAGS INTERFACE
 		OpenGL::GL
 		PCAP::PCAP
 		LibXml2::LibXml2
@@ -1505,13 +1666,6 @@ if (APPLE)
 		set_source_files_properties("${file}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 	endforeach()
 
-	# Add in shaders and other resources.
-	file(GLOB resource_files "${CMAKE_SOURCE_DIR}/bin/resources/*")
-	foreach(file ${resource_files})
-		target_sources(PCSX2 PRIVATE "${file}")
-		set_source_files_properties("${file}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-	endforeach()
-
 	# If they say to skip postprocess bundle, leave the target in but make it so they have
 	# to manually run it
 	if (SKIP_POSTPROCESS_BUNDLE)
@@ -1557,3 +1711,4 @@ source_group(Resources/PAD FILES ${pcsx2PADResources})
 source_group(Resources/Recording FILES ${pcsx2RecordingVirtualPadResources})
 source_group(Resources FILES gui/Resources/PCSX2.icns)
 source_group(Resources REGULAR_EXPRESSION ${CMAKE_CURRENT_BINARY_DIR}/*)
+

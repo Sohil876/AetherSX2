@@ -19,7 +19,7 @@
 
 #include "Sio.h"
 #include "Sif.h"
-#include "DebugTools/Breakpoints.h"
+//#include "DebugTools/Breakpoints.h"
 #include "R5900OpcodeTables.h"
 
 using namespace R3000A;
@@ -52,7 +52,7 @@ bool iopEventAction = false;
 
 bool iopEventTestIsActive = false;
 
-alignas(16) psxRegisters psxRegs;
+__aligned16 psxRegisters psxRegs;
 
 void psxReset()
 {
@@ -266,18 +266,21 @@ inline bool psxIsBranchOrJump(u32 addr)
 int psxIsBreakpointNeeded(u32 addr)
 {
 	int bpFlags = 0;
+#if 0
 	if (CBreakPoints::IsAddressBreakPoint(BREAKPOINT_IOP, addr))
 		bpFlags += 1;
 
 	// there may be a breakpoint in the delay slot
 	if (psxIsBranchOrJump(addr) && CBreakPoints::IsAddressBreakPoint(BREAKPOINT_IOP, addr + 4))
 		bpFlags += 2;
+#endif
 
 	return bpFlags;
 }
 
 int psxIsMemcheckNeeded(u32 pc)
 {
+#if 0
 	if (CBreakPoints::GetNumMemchecks() == 0)
 		return 0;
 
@@ -290,6 +293,6 @@ int psxIsMemcheckNeeded(u32 pc)
 
 	if (opcode.flags & IS_MEMORY)
 		return addr == pc ? 1 : 2;
-
+#endif
 	return 0;
 }

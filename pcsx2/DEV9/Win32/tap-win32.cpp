@@ -15,6 +15,8 @@
 
 #include "PrecompiledHeader.h"
 
+#include "common/RedtapeWindows.h"
+
 #include <stdio.h>
 #include <windows.h>
 #include <winsock2.h>
@@ -486,7 +488,7 @@ bool TAPGetWin32Adapter(const char* name, PIP_ADAPTER_ADDRESSES adapter, std::un
 									wil::unique_cotaskmem_string dispName;
 									hr = component->GetDisplayName(dispName.put());
 									if (SUCCEEDED(hr))
-										Console.WriteLn(L"DEV9: %s is possible bridge (Check 2 passed)", dispName);
+										Console.WriteLn(L"DEV9: %s is possible bridge (Check 2 passed)", dispName.get());
 
 									//Check if adapter has the ms_bridge component bound to it.
 									auto bindings = bridge.try_query<INetCfgComponentBindings>();
@@ -499,7 +501,7 @@ bool TAPGetWin32Adapter(const char* name, PIP_ADAPTER_ADDRESSES adapter, std::un
 
 									hr = component->GetDisplayName(dispName.put());
 									if (SUCCEEDED(hr))
-										Console.WriteLn(L"DEV9: %s is bridge (Check 3 passed)", dispName);
+										Console.WriteLn(L"DEV9: %s is bridge (Check 3 passed)", dispName.get());
 
 									bridgeAdapter = cAdapterInfo;
 									break;

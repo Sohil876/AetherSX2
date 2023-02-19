@@ -19,7 +19,7 @@
 #include "newVif.h"
 #include "Gif_Unit.h"
 
-VU_Thread vu1Thread(CpuVU1, VU1);
+__aligned16 VU_Thread vu1Thread(CpuVU1, VU1);
 
 #define MTVU_ALWAYS_KICK 0
 #define MTVU_SYNC_MODE 0
@@ -91,6 +91,9 @@ VU_Thread::VU_Thread(BaseVUmicroCPU*& _vuCPU, VURegs& _vuRegs)
 	, vuRegs(_vuRegs)
 {
 	m_name = L"MTVU";
+#ifdef _M_ARM64
+	m_stack_size = 2 * 1024 * 1024;
+#endif
 	Reset();
 }
 

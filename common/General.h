@@ -183,13 +183,8 @@ static __fi PageProtectionMode PageAccess_Any()
 // platform prior to wxWidgets .. it should prolly be removed -- air)
 namespace HostSys
 {
-	void* MmapReserve(uptr base, size_t size);
-	bool MmapCommit(uptr base, size_t size, const PageProtectionMode& mode);
-	void MmapReset(uptr base, size_t size);
-
-	void* MmapReservePtr(void* base, size_t size);
-	bool MmapCommitPtr(void* base, size_t size, const PageProtectionMode& mode);
-	void MmapResetPtr(void* base, size_t size);
+	void *MmapAllocate(uptr base, size_t size, const PageProtectionMode& mode);
+	void *MmapAllocatePtr(void *base, size_t size, const PageProtectionMode& mode);
 
 	// Maps a block of memory for use as a recompiled code buffer.
 	// Returns NULL on allocation failure.
@@ -207,7 +202,14 @@ namespace HostSys
 	{
 		MemProtect(arr, size, mode);
 	}
-} // namespace HostSys
+
+	extern wxString GetFileMappingName(const char* prefix);
+	extern void* CreateSharedMemory(const wxString& name, size_t size);
+	extern void DestroySharedMemory(void* ptr);
+	extern void* ReserveSharedMemoryArea(size_t size);
+	extern void* MapSharedMemory(void* handle, size_t offset, void* baseaddr, size_t size, const PageProtectionMode& mode);
+	extern void UnmapSharedMemory(void* handle, void* baseaddr, size_t size);
+}
 
 // Safe version of Munmap -- NULLs the pointer variable immediately after free'ing it.
 #define SafeSysMunmap(ptr, size) \

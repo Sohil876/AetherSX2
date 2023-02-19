@@ -18,7 +18,6 @@
 #include "gui/AppConfig.h"
 
 #ifdef _WIN32
-#include "GS/GSExtra.h"
 #include "GS/Renderers/DX11/D3D.h"
 #endif
 
@@ -37,9 +36,9 @@ namespace
 		for (const GSSetting& setting : s)
 		{
 			if (!setting.note.empty())
-				arr.Add(fromUTF8(setting.name + " (" + setting.note + ")"));
+				arr.Add(setting.name + " (" + setting.note + ")");
 			else
-				arr.Add(fromUTF8(setting.name));
+				arr.Add(setting.name);
 		}
 	}
 
@@ -205,8 +204,8 @@ void GSUIElementHolder::Load()
 			case UIElem::Type::Directory:
 			{
 				auto* picker = static_cast<wxFileDirPickerCtrlBase*>(elem.control);
-				picker->SetInitialDirectory(fromUTF8(theApp.GetConfigS(elem.config)));
-				picker->SetPath(fromUTF8(theApp.GetConfigS(elem.config)));
+				picker->SetInitialDirectory(theApp.GetConfigS(elem.config));
+				picker->SetPath(theApp.GetConfigS(elem.config));
 				break;
 			}
 		}
@@ -236,7 +235,7 @@ void GSUIElementHolder::Save()
 				break;
 			case UIElem::Type::File:
 			case UIElem::Type::Directory:
-				theApp.SetConfig(elem.config, static_cast<wxFileDirPickerCtrlBase*>(elem.control)->GetPath().ToUTF8());
+				theApp.SetConfig(elem.config, static_cast<wxFileDirPickerCtrlBase*>(elem.control)->GetPath());
 				break;
 		}
 	}
@@ -267,7 +266,6 @@ RendererTab::RendererTab(wxWindow* parent)
 	const int space = wxSizerFlags().Border().GetBorderInPixels();
 	auto hw_prereq = [this]{ return m_is_hardware; };
 	auto sw_prereq = [this]{ return !m_is_hardware; };
-	auto upscale_prereq = [this]{ return !m_is_native_res; };
 
 	PaddedBoxSizer<wxBoxSizer> tab_box(wxVERTICAL);
 	PaddedBoxSizer<wxStaticBoxSizer> hardware_box(wxVERTICAL, this, "Hardware Mode");
@@ -275,17 +273,15 @@ RendererTab::RendererTab(wxWindow* parent)
 
 	auto* hw_checks_box = new wxWrapSizer(wxHORIZONTAL);
 
+	m_ui.addCheckBox(hw_checks_box, "GPU Palette Conversion",          "paltex",                   IDC_PALTEX,          hw_prereq);
+	m_ui.addCheckBox(hw_checks_box, "Conservative Buffer Allocation",  "conservative_framebuffer", IDC_CONSERVATIVE_FB, hw_prereq);
 	m_ui.addCheckBox(hw_checks_box, "Accurate Destination Alpha Test", "accurate_date",            IDC_ACCURATE_DATE,   hw_prereq);
-	m_ui.addCheckBox(hw_checks_box, "Conservative Buffer Allocation",  "conservative_framebuffer", IDC_CONSERVATIVE_FB, upscale_prereq);
-
-	auto* paltex_prereq = m_ui.addCheckBox(hw_checks_box, "GPU Palette Conversion", "paltex", IDC_PALTEX, hw_prereq);
-	auto aniso_prereq = [this, paltex_prereq]{ return m_is_hardware && !m_is_nearest_filter && paltex_prereq->GetValue() == false; };
 
 	auto* hw_choice_grid = new wxFlexGridSizer(2, space, space);
 
 	m_internal_resolution = m_ui.addComboBoxAndLabel(hw_choice_grid, "Internal Resolution:", "upscale_multiplier", &theApp.m_gs_upscale_multiplier, -1, hw_prereq).first;
 
-	m_ui.addComboBoxAndLabel(hw_choice_grid, "Anisotropic Filtering:", "MaxAnisotropy",  &theApp.m_gs_max_anisotropy, IDC_AFCOMBO,   aniso_prereq);
+	m_ui.addComboBoxAndLabel(hw_choice_grid, "Anisotropic Filtering:", "MaxAnisotropy",  &theApp.m_gs_max_anisotropy, IDC_AFCOMBO,   hw_prereq);
 	m_ui.addComboBoxAndLabel(hw_choice_grid, "Dithering (PgDn):",      "dithering_ps2",  &theApp.m_gs_dithering,      IDC_DITHERING, hw_prereq);
 	m_ui.addComboBoxAndLabel(hw_choice_grid, "Mipmapping (Insert):",   "mipmap_hw",      &theApp.m_gs_hw_mipmapping,  IDC_MIPMAP_HW, hw_prereq);
 	m_ui.addComboBoxAndLabel(hw_choice_grid, "CRC Hack Level:",        "crc_hack_level", &theApp.m_gs_crc_level,      IDC_CRC_LEVEL, hw_prereq);
@@ -321,7 +317,7 @@ RendererTab::RendererTab(wxWindow* parent)
 void RendererTab::UpdateBlendMode(GSRendererType renderer)
 {
 #ifdef _WIN32
-	if (renderer == GSRendererType::DX1011_HW)
+	if (renderer == GSRendererType::DX11)
 	{
 		m_blend_mode_d3d11.first ->Show();
 		m_blend_mode_d3d11.second->Show();
@@ -345,10 +341,8 @@ HacksTab::HacksTab(wxWindow* parent)
 	const int space = wxSizerFlags().Border().GetBorderInPixels();
 	PaddedBoxSizer<wxBoxSizer> tab_box(wxVERTICAL);
 
-	auto hw_prereq = [this]{ return m_is_hardware; };
-	auto* hacks_check_box = m_ui.addCheckBox(tab_box.inner, "Enable HW Hacks", "UserHacks", -1, hw_prereq);
-	auto hacks_prereq = [this, hacks_check_box]{ return m_is_hardware && hacks_check_box->GetValue(); };
-	auto gl_hacks_prereq = [this, hacks_check_box]{ return m_is_ogl_hw && hacks_check_box->GetValue(); };
+	auto* hacks_check_box = m_ui.addCheckBox(tab_box.inner, "Enable User Hacks", "UserHacks");
+	CheckboxPrereq hacks_check(hacks_check_box);
 	auto upscale_hacks_prereq = [this, hacks_check_box]{ return !m_is_native_res && hacks_check_box->GetValue(); };
 
 	PaddedBoxSizer<wxStaticBoxSizer> rend_hacks_box   (wxVERTICAL, this, "Renderer Hacks");
@@ -358,13 +352,13 @@ HacksTab::HacksTab(wxWindow* parent)
 	auto* upscale_hacks_grid = new wxFlexGridSizer(3, space, space);
 
 	// Renderer Hacks
-	m_ui.addCheckBox(rend_hacks_grid, "Auto Flush",                "UserHacks_AutoFlush",                  IDC_AUTO_FLUSH_HW,     hacks_prereq);
-	m_ui.addCheckBox(rend_hacks_grid, "Frame Buffer Conversion",   "UserHacks_CPU_FB_Conversion",          IDC_CPU_FB_CONVERSION, hacks_prereq);
-	m_ui.addCheckBox(rend_hacks_grid, "Disable Depth Emulation",   "UserHacks_DisableDepthSupport",        IDC_TC_DEPTH,          hacks_prereq);
-	m_ui.addCheckBox(rend_hacks_grid, "Memory Wrapping",           "wrap_gs_mem",                          IDC_MEMORY_WRAPPING,   hacks_prereq);
-	m_ui.addCheckBox(rend_hacks_grid, "Disable Safe Features",     "UserHacks_Disable_Safe_Features",      IDC_SAFE_FEATURES,     hacks_prereq);
-	m_ui.addCheckBox(rend_hacks_grid, "Preload Frame Data",        "preload_frame_with_gs_data",           IDC_PRELOAD_GS,        hacks_prereq);
-	m_ui.addCheckBox(rend_hacks_grid, "Fast Texture Invalidation", "UserHacks_DisablePartialInvalidation", IDC_FAST_TC_INV,       hacks_prereq);
+	m_ui.addCheckBox(rend_hacks_grid, "Auto Flush",                "UserHacks_AutoFlush",                  IDC_AUTO_FLUSH_HW,     hacks_check);
+	m_ui.addCheckBox(rend_hacks_grid, "Fast Texture Invalidation", "UserHacks_DisablePartialInvalidation", IDC_FAST_TC_INV,       hacks_check);
+	m_ui.addCheckBox(rend_hacks_grid, "Disable Depth Emulation",   "UserHacks_DisableDepthSupport",        IDC_TC_DEPTH,          hacks_check);
+	m_ui.addCheckBox(rend_hacks_grid, "Frame Buffer Conversion",   "UserHacks_CPU_FB_Conversion",          IDC_CPU_FB_CONVERSION, hacks_check);
+	m_ui.addCheckBox(rend_hacks_grid, "Disable Safe Features",     "UserHacks_Disable_Safe_Features",      IDC_SAFE_FEATURES,     hacks_check);
+	m_ui.addCheckBox(rend_hacks_grid, "Memory Wrapping",           "wrap_gs_mem",                          IDC_MEMORY_WRAPPING,   hacks_check);
+	m_ui.addCheckBox(rend_hacks_grid, "Preload Frame Data",        "preload_frame_with_gs_data",           IDC_PRELOAD_GS,        hacks_check);
 
 	// Upscale
 	m_ui.addCheckBox(upscale_hacks_grid, "Align Sprite",   "UserHacks_align_sprite_X",  IDC_ALIGN_SPRITE,    upscale_hacks_prereq);
@@ -377,31 +371,31 @@ HacksTab::HacksTab(wxWindow* parent)
 	upscale_hack_choice_grid->AddGrowableCol(1);
 
 	// Renderer Hacks:
-	m_ui.addComboBoxAndLabel(rend_hack_choice_grid, "Half Screen Fix:",     "UserHacks_Half_Bottom_Override", &theApp.m_gs_generic_list, IDC_HALF_SCREEN_TS, hacks_prereq);
-	m_ui.addComboBoxAndLabel(rend_hack_choice_grid, "Trilinear Filtering:", "UserHacks_TriFilter",            &theApp.m_gs_trifilter,    IDC_TRI_FILTER,     gl_hacks_prereq);
+	m_ui.addComboBoxAndLabel(rend_hack_choice_grid, "Half Screen Fix:",     "UserHacks_HalfPixelOffset", &theApp.m_gs_generic_list, IDC_HALF_SCREEN_TS, hacks_check);
+	m_ui.addComboBoxAndLabel(rend_hack_choice_grid, "Trilinear Filtering:", "UserHacks_TriFilter",       &theApp.m_gs_trifilter,    IDC_TRI_FILTER,     hacks_check);
 
 	// Skipdraw Range
 	add_label(this, rend_hack_choice_grid, "Skipdraw Range:", IDC_SKIPDRAWHACK);
 	auto* skip_box = new wxBoxSizer(wxHORIZONTAL);
-	skip_x_spin = m_ui.addSpin(skip_box, "UserHacks_SkipDraw_Offset", 0, 10000, 0, IDC_SKIPDRAWOFFSET, hacks_prereq);
-	skip_y_spin = m_ui.addSpin(skip_box, "UserHacks_SkipDraw",        0, 10000, 0, IDC_SKIPDRAWHACK,   hacks_prereq);
+	skip_x_spin = m_ui.addSpin(skip_box, "UserHacks_SkipDraw_Offset", 0, 10000, 0, IDC_SKIPDRAWOFFSET, hacks_check);
+	skip_y_spin = m_ui.addSpin(skip_box, "UserHacks_SkipDraw",        0, 10000, 0, IDC_SKIPDRAWHACK,   hacks_check);
 
 	rend_hack_choice_grid->Add(skip_box, wxSizerFlags().Expand());
 
 	// Upscale Hacks:
-	m_ui.addComboBoxAndLabel(upscale_hack_choice_grid, "Half-Pixel Offset:", "UserHacks_HalfPixelOffset",     &theApp.m_gs_offset_hack, IDC_OFFSETHACK,   upscale_hacks_prereq);
-	m_ui.addComboBoxAndLabel(upscale_hack_choice_grid, "Round Sprite:",      "UserHacks_round_sprite_offset", &theApp.m_gs_hack,        IDC_ROUND_SPRITE, upscale_hacks_prereq);
+	m_ui.addComboBoxAndLabel(upscale_hack_choice_grid, "Half-Pixel Offset:", "UserHacks_Half_Bottom_Override", &theApp.m_gs_offset_hack, IDC_OFFSETHACK,   upscale_hacks_prereq);
+	m_ui.addComboBoxAndLabel(upscale_hack_choice_grid, "Round Sprite:",      "UserHacks_round_sprite_offset",  &theApp.m_gs_hack,        IDC_ROUND_SPRITE, upscale_hacks_prereq);
 
 	// Texture Offsets
 	add_label(this, upscale_hack_choice_grid, "Texture Offsets:", IDC_TCOFFSETX);
 	auto* tex_off_box = new wxBoxSizer(wxHORIZONTAL);
 	add_label(this, tex_off_box, "X:", IDC_TCOFFSETX, wxSizerFlags().Centre());
 	tex_off_box->AddSpacer(space);
-	m_ui.addSpin(tex_off_box, "UserHacks_TCOffsetX", 0, 10000, 0, IDC_TCOFFSETX, hacks_prereq);
+	m_ui.addSpin(tex_off_box, "UserHacks_TCOffsetX", 0, 10000, 0, IDC_TCOFFSETX, hacks_check);
 	tex_off_box->AddSpacer(space);
 	add_label(this, tex_off_box, "Y:", IDC_TCOFFSETY, wxSizerFlags().Centre());
 	tex_off_box->AddSpacer(space);
-	m_ui.addSpin(tex_off_box, "UserHacks_TCOffsetY", 0, 10000, 0, IDC_TCOFFSETY, hacks_prereq);
+	m_ui.addSpin(tex_off_box, "UserHacks_TCOffsetY", 0, 10000, 0, IDC_TCOFFSETY, hacks_check);
 
 	upscale_hack_choice_grid->Add(tex_off_box, wxSizerFlags().Expand());
 
@@ -514,30 +508,25 @@ OSDTab::OSDTab(wxWindow* parent)
 	const int space = wxSizerFlags().Border().GetBorderInPixels();
 	PaddedBoxSizer<wxBoxSizer> tab_box(wxVERTICAL);
 
-	CheckboxPrereq monitor_check(m_ui.addCheckBox(tab_box.inner, "Enable Monitor", "osd_monitor_enabled", IDC_OSD_MONITOR));
-
-	PaddedBoxSizer<wxStaticBoxSizer> font_box(wxVERTICAL, this, "Font");
+	PaddedBoxSizer<wxStaticBoxSizer> font_box(wxVERTICAL, this, "Visuals");
 	auto* font_grid = new wxFlexGridSizer(2, space, space);
 	font_grid->AddGrowableCol(1);
 
-	m_ui.addSpinAndLabel(font_grid, "Size:", "osd_fontsize", 1, 100, 25, -1, monitor_check);
-
-	m_ui.addSliderAndLabel(font_grid, "Red:",     "osd_color_r",       0, 255,   0, -1, monitor_check);
-	m_ui.addSliderAndLabel(font_grid, "Green:",   "osd_color_g",       0, 255,   0, -1, monitor_check);
-	m_ui.addSliderAndLabel(font_grid, "Blue:",    "osd_color_b",       0, 255,   0, -1, monitor_check);
-	m_ui.addSliderAndLabel(font_grid, "Opacity:", "osd_color_opacity", 0, 100, 100, -1, monitor_check);
+	m_ui.addSliderAndLabel(font_grid, "Scale:",   "osd_scale", 50, 300, 100, -1);
 
 	font_box->Add(font_grid, wxSizerFlags().Expand());
 	tab_box->Add(font_box.outer, wxSizerFlags().Expand());
-
-	CheckboxPrereq log_check(m_ui.addCheckBox(tab_box.inner, "Enable Log", "osd_log_enabled", IDC_OSD_LOG));
 
 	PaddedBoxSizer<wxStaticBoxSizer> log_box(wxVERTICAL, this, "Log Messages");
 	auto* log_grid = new wxFlexGridSizer(2, space, space);
 	log_grid->AddGrowableCol(1);
 
-	m_ui.addSpinAndLabel(log_grid, "Timeout (seconds):",      "osd_log_timeout",      2, 10, 4,              -1, log_check);
-	m_ui.addSpinAndLabel(log_grid, "Max On-Screen Messages:", "osd_max_log_messages", 1, 10, 2, IDC_OSD_MAX_LOG, log_check);
+	m_ui.addCheckBox(log_grid, "Show Messages", "osd_show_messages", -1);
+	m_ui.addCheckBox(log_grid, "Show Speed", "osd_show_speed", -1);
+	m_ui.addCheckBox(log_grid, "Show FPS", "osd_show_fps", -1);
+	m_ui.addCheckBox(log_grid, "Show CPU Usage", "osd_show_cpu", -1);
+	m_ui.addCheckBox(log_grid, "Show Resolution", "osd_show_resolution", -1);
+	m_ui.addCheckBox(log_grid, "Show Statistics", "osd_show_gs_stats", -1);
 
 	log_box->Add(log_grid, wxSizerFlags().Expand());
 	tab_box->Add(log_box.outer, wxSizerFlags().Expand());
@@ -559,10 +548,7 @@ DebugTab::DebugTab(wxWindow* parent)
 		PaddedBoxSizer<wxStaticBoxSizer> debug_box(wxVERTICAL, this, "Debug");
 		auto* debug_check_box = new wxWrapSizer(wxHORIZONTAL);
 		m_ui.addCheckBox(debug_check_box, "GLSL compilation", "debug_glsl_shader");
-		m_ui.addCheckBox(debug_check_box, "Print GL error", "debug_opengl");
-#ifdef _WIN32
-		m_ui.addCheckBox(debug_check_box, "D3D Debug Layer", "debug_d3d");
-#endif
+		m_ui.addCheckBox(debug_check_box, "Use Debug Device", "debug_device");
 		m_ui.addCheckBox(debug_check_box, "Dump GS data", "dump");
 
 		auto* debug_save_check_box = new wxWrapSizer(wxHORIZONTAL);
@@ -576,8 +562,8 @@ DebugTab::DebugTab(wxWindow* parent)
 
 		auto* dump_grid = new wxFlexGridSizer(2, space, space);
 
-		m_ui.addSpinAndLabel(dump_grid, "Start of Dump:",  "saven", 0, pow(10, 9),    0);
-		m_ui.addSpinAndLabel(dump_grid, "Length of Dump:", "savel", 1, pow(10, 5), 5000);
+		start_dump_spin = m_ui.addSpinAndLabel(dump_grid, "Start of Dump:", "saven", 0, pow(10, 9),    0).first;
+		end_dump_spin   = m_ui.addSpinAndLabel(dump_grid, "End of Dump:",   "savel", 0, pow(10, 5), 5000).first;
 
 		debug_box->AddSpacer(space);
 		debug_box->Add(dump_grid);
@@ -600,6 +586,10 @@ DebugTab::DebugTab(wxWindow* parent)
 void DebugTab::DoUpdate()
 {
 	m_ui.Update();
+	if (!end_dump_spin || !start_dump_spin)
+		return;
+	if (end_dump_spin->GetValue() < start_dump_spin->GetValue())
+		end_dump_spin->SetValue(start_dump_spin->GetValue());
 }
 
 Dialog::Dialog()
@@ -623,8 +613,7 @@ Dialog::Dialog()
 #endif
 
 	m_ui.addComboBoxAndLabel(top_grid, "Interlacing (F5):", "interlace", &theApp.m_gs_interlace);
-
-	m_bifilter_select = m_ui.addComboBoxAndLabel(top_grid, "Texture Filtering:", "filter", &theApp.m_gs_bifilter, IDC_FILTER).first;
+	m_ui.addComboBoxAndLabel(top_grid, "Texture Filtering:", "filter", &theApp.m_gs_bifilter, IDC_FILTER);
 
 	auto* book = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize);
 
@@ -643,9 +632,9 @@ Dialog::Dialog()
 	book->AddPage(m_debug_panel, "Advanced");
 
 	m_top_box->Add(top_grid, wxSizerFlags().Centre());
-	m_top_box->Add(book, wxSizerFlags(1).Expand());
+	m_top_box->Add(book, wxSizerFlags().Expand());
 
-	padding->Add(m_top_box, wxSizerFlags(1).Expand().Border());
+	padding->Add(m_top_box, wxSizerFlags().Expand().Border());
 
 	m_top_box->Add(CreateStdDialogButtonSizer(wxOK | wxCANCEL), wxSizerFlags().Right());
 
@@ -691,24 +680,23 @@ void Dialog::RendererChange()
 	GSRendererType renderer = GetSelectedRendererType();
 	m_adapter_select->Clear();
 
-	if (renderer == GSRendererType::DX1011_HW)
+	if (renderer == GSRendererType::DX11)
 	{
 		auto factory = D3D::CreateFactory(false);
 		auto adapter_list = D3D::GetAdapterList(factory.get());
 
-		wxArrayString adapter_arr_string;
+		const std::string current_adapter(theApp.GetConfigS("adapter"));
+
 		for (const auto name : adapter_list)
 		{
-			adapter_arr_string.push_back(
-				convert_utf8_to_utf16(name)
+			m_adapter_select->Insert(
+				convert_utf8_to_utf16(name), m_adapter_select->GetCount()
 			);
+			if (current_adapter == name)
+				m_adapter_select->SetSelection(m_adapter_select->GetCount() - 1);
 		}
 
-		m_adapter_select->Insert(adapter_arr_string, 0);
 		m_adapter_select->Enable();
-		m_adapter_select->SetSelection(
-			theApp.GetConfigI("adapter_index")
-		);
 	}
 	else
 	{
@@ -725,8 +713,8 @@ void Dialog::Load()
 	m_ui.Load();
 #ifdef _WIN32
 	GSRendererType renderer = GSRendererType(theApp.GetConfigI("Renderer"));
-	if (renderer == GSRendererType::Undefined)
-		renderer = D3D::ShouldPreferD3D() ? GSRendererType::DX1011_HW : GSRendererType::OGL_HW;
+	if (renderer == GSRendererType::Auto)
+		renderer = D3D::ShouldPreferD3D() ? GSRendererType::DX11 : GSRendererType::OGL;
 	m_renderer_select->SetSelection(get_config_index(theApp.m_gs_renderers, static_cast<int>(renderer)));
 #endif
 
@@ -746,13 +734,8 @@ void Dialog::Save()
 #ifdef _WIN32
 	// only save the adapter when it makes sense to
 	// prevents changing the adapter, switching to another renderer and saving
-	if (GetSelectedRendererType() == GSRendererType::DX1011_HW)
-	{
-		const int current_adapter =
-			m_adapter_select->GetSelection();
-
-		theApp.SetConfig("adapter_index", current_adapter);
-	}
+	if (GetSelectedRendererType() == GSRendererType::DX11)
+		theApp.SetConfig("adapter", m_adapter_select->GetStringSelection().c_str());
 #endif
 
 	m_hacks_panel->Save();
@@ -780,16 +763,11 @@ void Dialog::Update()
 	else
 	{
 		// cross-tab dependencies yay
-		const bool is_hw = renderer == GSRendererType::OGL_HW || renderer == GSRendererType::DX1011_HW;
-		const bool is_upscale = m_renderer_panel->m_internal_resolution->GetSelection() != 0;
-		const bool is_nearest_filter = m_bifilter_select->GetSelection() == static_cast<int>(BiFiltering::Nearest);
+		bool is_hw = renderer == GSRendererType::OGL || renderer == GSRendererType::DX11 || renderer == GSRendererType::VK;
+		bool is_upscale = m_renderer_panel->m_internal_resolution->GetSelection() != 0;
 		m_hacks_panel->m_is_native_res = !is_hw || !is_upscale;
-		m_hacks_panel->m_is_hardware = is_hw;
-		m_hacks_panel->m_is_ogl_hw = renderer == GSRendererType::OGL_HW;
 		m_renderer_panel->m_is_hardware = is_hw;
-		m_renderer_panel->m_is_native_res = !is_hw || !is_upscale;
-		m_renderer_panel->m_is_nearest_filter = is_nearest_filter;
-		m_debug_panel->m_is_ogl_hw = renderer == GSRendererType::OGL_HW;
+		m_debug_panel->m_is_ogl_hw = renderer == GSRendererType::OGL;
 
 		m_ui.Update();
 		m_hacks_panel->DoUpdate();

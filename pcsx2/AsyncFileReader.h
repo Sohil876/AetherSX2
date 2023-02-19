@@ -76,6 +76,9 @@ class FlatFileReader : public AsyncFileReader
 	bool asyncInProgress;
 #elif defined(__linux__)
 	int m_fd; // FIXME don't know if overlap as an equivalent on linux
+#ifdef __ANDROID__
+	int m_result;
+#endif
 	io_context_t m_aio_context;
 #elif defined(__POSIX__)
 	int m_fd; // TODO OSX don't know if overlap as an equivalent on OSX
@@ -103,6 +106,10 @@ public:
 
 	virtual void SetBlockSize(uint bytes) override { m_blocksize = bytes; }
 	virtual void SetDataOffset(int bytes) override { m_dataoffset = bytes; }
+
+#if defined(__ANDROID__)
+	static bool USE_AIO;
+#endif
 };
 
 class MultipartFileReader : public AsyncFileReader

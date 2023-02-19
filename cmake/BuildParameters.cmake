@@ -48,10 +48,11 @@ option(DISABLE_PCSX2_WRAPPER "Disable including the PCSX2-linux.sh file")
 option(DISABLE_SETCAP "Do not set files capabilities")
 option(XDG_STD "Use XDG standard path instead of the standard PCSX2 path")
 option(PORTAUDIO_API "Build portaudio support on SPU2" ON)
+option(CUBEB_API "Build Cubeb support on SPU2" ON)
 option(SDL2_API "Use SDL2 on SPU2 and PAD Linux (wxWidget mustn't be built with SDL1.2 support" ON)
 option(GTK2_API "Use GTK2 api (legacy)")
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT ANDROID)
 	option(X11_API "Enable X11 support" ON)
 	option(WAYLAND_API "Enable Wayland support" OFF)
 endif()
@@ -121,7 +122,15 @@ endif()
 # It only cost several MB so disbable it by default
 option(CMAKE_BUILD_STRIP "Srip binaries to save a couple of MB (developer option)")
 
-option(CMAKE_BUILD_PO "Build po files (modifies git-tracked files)" OFF)
+if(NOT DEFINED CMAKE_BUILD_PO)
+	if(CMAKE_BUILD_TYPE STREQUAL "Release")
+		set(CMAKE_BUILD_PO TRUE)
+		message(STATUS "Enable the building of po files by default in ${CMAKE_BUILD_TYPE} build !!!")
+	else()
+		set(CMAKE_BUILD_PO FALSE)
+		message(STATUS "Disable the building of po files by default in ${CMAKE_BUILD_TYPE} build !!!")
+	endif()
+endif()
 
 #-------------------------------------------------------------------------------
 # Select the architecture
@@ -138,7 +147,8 @@ endif()
 # Architecture bitness detection
 include(TargetArch)
 target_architecture(PCSX2_TARGET_ARCHITECTURES)
-if(${PCSX2_TARGET_ARCHITECTURES} MATCHES "x86_64" OR ${PCSX2_TARGET_ARCHITECTURES} MATCHES "i386")
+if(${PCSX2_TARGET_ARCHITECTURES} MATCHES "x86_64" OR ${PCSX2_TARGET_ARCHITECTURES} MATCHES "i386" OR
+   ${PCSX2_TARGET_ARCHITECTURES} MATCHES "aarch64")
 	message(STATUS "Compiling a ${PCSX2_TARGET_ARCHITECTURES} build on a ${CMAKE_HOST_SYSTEM_PROCESSOR} host.")
 else()
 	message(FATAL_ERROR "Unsupported architecture: ${PCSX2_TARGET_ARCHITECTURES}")
@@ -195,6 +205,12 @@ elseif(${PCSX2_TARGET_ARCHITECTURES} MATCHES "x86_64")
 	set(_ARCH_64 1)
 	set(_M_X86 1)
 	set(_M_X86_64 1)
+elseif(${PCSX2_TARGET_ARCHITECTURES} MATCHES "aarch64")
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    add_definitions(-D_ARCH_64=1 -D_M_ARM64=1)
+    add_definitions("-march=armv8-a+crc")
+    set(_ARCH_64 1)
+    set(_M_ARM64 1)
 else()
 	# All but i386 requires -fPIC
 	set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -215,10 +231,11 @@ option(USE_PGO_OPTIMIZE "Enable PGO optimization (use profile)")
 if(MSVC)
 	add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/Zc:externConstexpr>")
 else()
-	add_compile_options(-pipe -fvisibility=hidden -pthread -fno-builtin-strcmp -fno-builtin-memcmp -mfpmath=sse)
-
-	# -fno-operator-names should only be for C++ files, not C files.
-	add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fno-operator-names>)
+	if(${PCSX2_TARGET_ARCHITECTURES} MATCHES "aarch64")
+		add_compile_options(-pipe -fvisibility=hidden -pthread)
+	else()
+		add_compile_options(-pipe -fvisibility=hidden -pthread -fno-builtin-strcmp -fno-builtin-memcmp -mfpmath=sse -fno-operator-names)
+	endif()
 endif()
 
 if(WIN32)
@@ -299,7 +316,9 @@ endif()
 
 list(APPEND PCSX2_DEFS
 	"$<$<CONFIG:Debug>:PCSX2_DEVBUILD;PCSX2_DEBUG;_DEBUG>"
-	"$<$<CONFIG:Devel>:PCSX2_DEVBUILD;_DEVEL>")
+	"$<$<CONFIG:Devel>:PCSX2_DEVBUILD;_DEVEL>"
+	"$<$<CONFIG:Release>:NDEBUG>"
+)
 
 if (USE_ASAN)
 	add_compile_options(-fsanitize=address)
@@ -314,6 +333,17 @@ set(PCSX2_WARNINGS ${DEFAULT_WARNINGS} ${AGGRESSIVE_WARNING})
 
 if(CMAKE_BUILD_STRIP)
 	add_link_options(-s)
+endif()
+
+if(QT_BUILD OR ANDROID)
+	# We want the core PCSX2 library.
+	set(PCSX2_CORE TRUE)
+endif()
+
+# Default symbol visibility to hidden, that way we don't go through the PLT for intra-library calls.
+if(ANDROID)
+  set(CMAKE_C_VISIBILITY_PRESET hidden)
+  set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 endif()
 
 # Enable special stuff for CI builds

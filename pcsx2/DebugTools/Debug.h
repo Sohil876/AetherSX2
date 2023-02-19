@@ -242,11 +242,6 @@ public:
 
 		return false;
 	}
-
-	bool Write(const std::string& msg) const
-	{
-		return Write(fromUTF8(msg));
-	}
 };
 
 // --------------------------------------------------------------------------------------

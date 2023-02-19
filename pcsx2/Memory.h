@@ -21,6 +21,7 @@
 
 #include "vtlb.h"
 
+#if defined(_M_X86_32) || defined(_M_X86_64)
 #include "common/emitter/x86_intrin.h"
 
 // [TODO] This *could* be replaced with an assignment operator on u128 that implicitly
@@ -41,6 +42,34 @@ static __fi void ZeroQWC( u128& dest )
 {
 	_mm_store_ps( (float*)&dest, _mm_setzero_ps() );
 }
+
+#else
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#include <arm64_neon.h>
+#else
+#include <arm_neon.h>
+#endif
+
+static __fi void CopyQWC(void* dest, const void* src)
+{
+	//std::memcpy(dest, src, 16);
+	vst1q_u8(static_cast<u8*>(dest), vld1q_u8(static_cast<const u8*>(src)));
+}
+
+static __fi void ZeroQWC(void* dest)
+{
+	//std::memset(dest, 0, 16);
+	vst1q_u8(static_cast<u8*>(dest), vmovq_n_u8(0));
+}
+
+static __fi void ZeroQWC(u128& dest)
+{
+	//std::memset(&dest, 0, sizeof(u128));
+	vst1q_u8(&dest._u8[0], vmovq_n_u8(0));
+}
+
+#endif
 
 #define PSM(mem)	(vtlb_GetPhyPtr((mem)&0x1fffffff)) //pcsx2 is a competition.The one with most hacks wins :D
 
@@ -136,11 +165,24 @@ extern void mmap_ResetBlockTracking();
 #define memWrite16 vtlb_memWrite<mem16_t>
 #define memWrite32 vtlb_memWrite<mem32_t>
 
+#ifndef _M_ARM64
+
 static __fi void memRead64(u32 mem, mem64_t* out)	{ _mm_storel_epi64((__m128i*)out, vtlb_memRead64(mem)); }
 static __fi void memRead64(u32 mem, mem64_t& out)	{ memRead64(mem, &out); }
 
 static __fi void memRead128(u32 mem, mem128_t* out) { _mm_store_si128((__m128i*)out, vtlb_memRead128(mem)); }
 static __fi void memRead128(u32 mem, mem128_t& out) { memRead128(mem, &out); }
+
+#else
+
+static __fi void memRead64(u32 mem, mem64_t* out) { *out = vtlb_memRead64(mem); }
+static __fi void memRead64(u32 mem, mem64_t& out) { memRead64(mem, &out); }
+
+static __fi void memRead128(u32 mem, mem128_t* out) { vst1q_u32((uint32_t*)out, vtlb_memRead128(mem)); }
+static __fi void memRead128(u32 mem, mem128_t& out) { memRead128(mem, &out); }
+
+#endif
+
 
 static __fi void memWrite64(u32 mem, const mem64_t* val)	{ vtlb_memWrite64(mem, val); }
 static __fi void memWrite64(u32 mem, const mem64_t& val)	{ vtlb_memWrite64(mem, &val); }

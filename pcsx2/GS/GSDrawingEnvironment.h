@@ -15,6 +15,8 @@
 
 #pragma once
 
+#include "GS.h"
+
 class alignas(32) GSDrawingEnvironment
 {
 public:

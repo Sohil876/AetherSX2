@@ -382,7 +382,7 @@ bool DoCDVDopen()
 	//Shouldn't the serial be available all time? Potentially need to look into Elfreloadinfo() reliability
 	//TODO: Add extra fallback case for CRC.
 	if (somepick.empty() && !DiscSerial.IsEmpty())
-		somepick = StringUtil::StdStringFromFormat("Untitled-%s", DiscSerial.ToUTF8().data());
+		somepick = StringUtil::StdStringFromFormat("Untitled-%s", static_cast<const char*>(DiscSerial.c_str()));
 	else if (somepick.empty())
 		somepick = "Untitled";
 
@@ -403,7 +403,7 @@ bool DoCDVDopen()
 	cdvdTD td;
 	CDVD->getTD(0, &td);
 
-	blockDumpFile.Create(std::move(temp), 2);
+	blockDumpFile.Create(StringUtil::wxStringToUTF8String(temp), 2);
 
 	if (blockDumpFile.IsOpened())
 	{
@@ -433,12 +433,7 @@ bool DoCDVDopen()
 void DoCDVDclose()
 {
 	CheckNullCDVD();
-
-#ifdef PCSX2_CORE
-	// This was commented out, presumably because pausing/resuming in wx reopens CDVD.
-	// This is a non-issue in Qt, so we'll leave it behind the ifdef.
-	blockDumpFile.Close();
-#endif
+	//blockDumpFile.Close();
 
 	if (CDVD->close != NULL)
 		CDVD->close();

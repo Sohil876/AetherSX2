@@ -54,7 +54,7 @@ namespace usb_pad
 		std::vector<JoystickDevice*> g_pJoysticks;
 		std::map<int, InputMapped> g_Controls[2];
 
-		static DWORD rgdwAxes[1] = {DIJOFS_X}; //FIXME if steering uses two axes, then this needs DIJOFS_Y too?
+		static DWORD rgdwAxes[1] = {static_cast<DWORD>(DIJOFS_X)}; //FIXME if steering uses two axes, then this needs DIJOFS_Y too?
 		static LONG rglDirection[1] = {0};
 
 		//only two effect (constant force, spring)

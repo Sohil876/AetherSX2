@@ -294,7 +294,7 @@ struct SSEMasks
 	u32 MIN_MAX_1[4], MIN_MAX_2[4], ADD_SS[4];
 };
 
-alignas(16) static const SSEMasks sseMasks =
+static const __aligned16 SSEMasks sseMasks =
 {
 	{0xffffffff, 0x80000000, 0xffffffff, 0x80000000},
 	{0x00000000, 0x40000000, 0x00000000, 0x40000000},
@@ -534,7 +534,7 @@ void SSE_DIVSS(mV, const xmm& to, const xmm& from, const xmm& t1 = xEmptyReg, co
 // Micro VU - Custom Quick Search
 //------------------------------------------------------------------
 
-alignas(__pagesize) u8 mVUsearchXMM[__pagesize];
+__pagealigned u8 mVUsearchXMM[__pagesize];
 
 // Generates a custom optimized block-search function
 // Note: Structs must be 16-byte aligned! (GCC doesn't guarantee this)

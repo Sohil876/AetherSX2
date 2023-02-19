@@ -28,7 +28,11 @@ __fi void Threading::Sleep(int ms)
 // improve performance and reduce cpu power consumption.
 __fi void Threading::SpinWait()
 {
+#ifndef _M_ARM64
 	_mm_pause();
+#else
+	YieldProcessor();
+#endif
 }
 
 __fi void Threading::EnableHiresScheduler()

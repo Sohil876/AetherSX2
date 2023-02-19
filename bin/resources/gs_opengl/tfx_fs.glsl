@@ -23,10 +23,11 @@
 #endif
 
 #define SW_BLEND (PS_BLEND_A || PS_BLEND_B || PS_BLEND_D)
+#define SW_BLEND_NEEDS_RT (PS_BLEND_A == 1 || PS_BLEND_B == 1 || PS_BLEND_C == 1 || PS_BLEND_D == 1)
 
 #ifdef FRAGMENT_SHADER
 
-#if !defined(BROKEN_DRIVER) && defined(GL_ARB_enhanced_layouts) && GL_ARB_enhanced_layouts
+#if !defined(BROKEN_DRIVER) && (pGL_ES || defined(GL_ARB_enhanced_layouts) && GL_ARB_enhanced_layouts)
 layout(location = 0)
 #endif
 in SHADER
@@ -37,12 +38,33 @@ in SHADER
     flat vec4 fc;
 } PSin;
 
-// Same buffer but 2 colors for dual source blending
-layout(location = 0, index = 0) out vec4 SV_Target0;
-layout(location = 0, index = 1) out vec4 SV_Target1;
+#define TARGET_0_QUALIFIER out
+
+// Only enable framebuffer fetch when we actually need it.
+#if HAS_FRAMEBUFFER_FETCH && (PS_TEX_IS_FB == 1 || PS_FBMASK || SW_BLEND_NEEDS_RT || PS_DATE != 0)
+  #if defined(GL_EXT_shader_framebuffer_fetch)
+    #undef TARGET_0_QUALIFIER
+    #define TARGET_0_QUALIFIER inout
+    #define LAST_FRAG_COLOR SV_Target0
+  #elif defined(GL_ARM_shader_framebuffer_fetch)
+    #define LAST_FRAG_COLOR gl_LastFragColorARM
+  #endif
+#endif
+
+#ifndef DISABLE_DUAL_SOURCE
+  // Same buffer but 2 colors for dual source blending
+  layout(location = 0, index = 0) TARGET_0_QUALIFIER vec4 SV_Target0;
+  layout(location = 0, index = 1) out vec4 SV_Target1;
+#else
+  layout(location = 0) TARGET_0_QUALIFIER vec4 SV_Target0;
+#endif
 
 layout(binding = 1) uniform sampler2D PaletteSampler;
+
+#if !HAS_FRAMEBUFFER_FETCH
 layout(binding = 3) uniform sampler2D RtSampler; // note 2 already use by the image below
+#endif
+
 layout(binding = 4) uniform sampler2D RawTextureSampler;
 
 #ifndef DISABLE_GL42_image
@@ -79,7 +101,11 @@ layout(early_fragment_tests) in;
 vec4 sample_c(vec2 uv)
 {
 #if PS_TEX_IS_FB == 1
+#if HAS_FRAMEBUFFER_FETCH
+    return LAST_FRAG_COLOR;
+#else
     return texelFetch(RtSampler, ivec2(gl_FragCoord.xy), 0);
+#endif
 #else
 
 #if PS_POINT_SAMPLER
@@ -108,7 +134,7 @@ vec4 sample_c(vec2 uv)
 
     return textureLod(TextureSampler, uv, lod);
 #else
-    return textureLod(TextureSampler, uv, 0); // No lod
+    return textureLod(TextureSampler, uv, 0.0f); // No lod
 #endif
 
 #endif
@@ -232,7 +258,11 @@ mat4 sample_4p(vec4 u)
 
 int fetch_raw_depth()
 {
+#if HAS_CLIP_CONTROL
     return int(texelFetch(RawTextureSampler, ivec2(gl_FragCoord.xy), 0).r * exp2(32.0f));
+#else
+    return int(texelFetch(RawTextureSampler, ivec2(gl_FragCoord.xy), 0).r * exp2(24.0f));
+#endif
 }
 
 vec4 fetch_raw_color()
@@ -323,7 +353,7 @@ vec4 sample_depth(vec2 st)
     const vec4 bitSh = vec4(exp2(24.0f), exp2(16.0f), exp2(8.0f), exp2(0.0f));
     const vec4 bitMsk = vec4(0.0, 1.0/256.0, 1.0/256.0, 1.0/256.0);
 
-    vec4 res = fract(vec4(fetch_c(uv).r) * bitSh);
+    vec4 res = fract(vec4(unscale_depth(fetch_c(uv).r)) * bitSh);
 
     t = (res - res.xxyz * bitMsk) * 256.0f;
 
@@ -333,7 +363,7 @@ vec4 sample_depth(vec2 st)
     // Convert a GL_FLOAT32 (only 16 lsb) depth into a RGB5A1 color texture
     const vec4 bitSh = vec4(exp2(32.0f), exp2(27.0f), exp2(22.0f), exp2(17.0f));
     const uvec4 bitMsk = uvec4(0x1F, 0x1F, 0x1F, 0x1);
-    uvec4 color = uvec4(vec4(fetch_c(uv).r) * bitSh) & bitMsk;
+    uvec4 color = uvec4(vec4(unscale_depth(fetch_c(uv).r)) * bitSh) & bitMsk;
 
     t = vec4(color) * vec4(8.0f, 8.0f, 8.0f, 128.0f);
 
@@ -369,17 +399,6 @@ vec4 fetch_red()
     return sample_p(rt.r) * 255.0f;
 }
 
-vec4 fetch_green()
-{
-#if PS_DEPTH_FMT == 1 || PS_DEPTH_FMT == 2
-    int depth = (fetch_raw_depth() >> 8) & 0xFF;
-    vec4 rt = vec4(depth) / 255.0f;
-#else
-    vec4 rt = fetch_raw_color();
-#endif
-    return sample_p(rt.g) * 255.0f;
-}
-
 vec4 fetch_blue()
 {
 #if PS_DEPTH_FMT == 1 || PS_DEPTH_FMT == 2
@@ -389,6 +408,12 @@ vec4 fetch_blue()
     vec4 rt = fetch_raw_color();
 #endif
     return sample_p(rt.b) * 255.0f;
+}
+
+vec4 fetch_green()
+{
+    vec4 rt = fetch_raw_color();
+    return sample_p(rt.g) * 255.0f;
 }
 
 vec4 fetch_alpha()
@@ -611,12 +636,16 @@ void ps_fbmask(inout vec4 C)
 {
     // FIXME do I need special case for 16 bits
 #if PS_FBMASK
+#if HAS_FRAMEBUFFER_FETCH
+    vec4 RT = trunc(LAST_FRAG_COLOR * 255.0f + 0.1f);
+#else
     vec4 RT = trunc(texelFetch(RtSampler, ivec2(gl_FragCoord.xy), 0) * 255.0f + 0.1f);
+#endif
     C = vec4((uvec4(C) & ~FbMask) | (uvec4(RT) & FbMask));
 #endif
 }
 
-void ps_dither(inout vec3 C)
+void ps_dither(inout vec4 C)
 {
 #if PS_DITHER
     #if PS_DITHER == 2
@@ -624,42 +653,22 @@ void ps_dither(inout vec3 C)
     #else
     ivec2 fpos = ivec2(gl_FragCoord.xy / ScalingFactor.x);
     #endif
-    C += DitherMatrix[fpos.y&3][fpos.x&3];
-#endif
-}
-
-void ps_color_clamp_wrap(inout vec3 C)
-{
-    // When dithering the bottom 3 bits become meaningless and cause lines in the picture
-    // so we need to limit the color depth on dithered items
-#if SW_BLEND || PS_DITHER
-
-    // Correct the Color value based on the output format
-#if PS_COLCLIP == 0 && PS_HDR == 0
-    // Standard Clamp
-    C = clamp(C, vec3(0.0f), vec3(255.0f));
-#endif
-
-    // FIXME rouding of negative float?
-    // compiler uses trunc but it might need floor
-
-    // Warning: normally blending equation is mult(A, B) = A * B >> 7. GPU have the full accuracy
-    // GS: Color = 1, Alpha = 255 => output 1
-    // GPU: Color = 1/255, Alpha = 255/255 * 255/128 => output 1.9921875
-#if PS_DFMT == FMT_16
-    // In 16 bits format, only 5 bits of colors are used. It impacts shadows computation of Castlevania
-    C = vec3(ivec3(C) & ivec3(0xF8));
-#elif PS_COLCLIP == 1 && PS_HDR == 0
-    C = vec3(ivec3(C) & ivec3(0xFF));
-#endif
-
+    C.rgb += DitherMatrix[fpos.y&3][fpos.x&3];
 #endif
 }
 
 void ps_blend(inout vec4 Color, float As)
 {
 #if SW_BLEND
+    vec4 Color_pabe = Color;
+    vec3 Cs = Color.rgb;
+
+#if SW_BLEND_NEEDS_RT
+#if HAS_FRAMEBUFFER_FETCH
+    vec4 RT = trunc(LAST_FRAG_COLOR * 255.0f + 0.1f);
+#else
     vec4 RT = trunc(texelFetch(RtSampler, ivec2(gl_FragCoord.xy), 0) * 255.0f + 0.1f);
+#endif
 
 #if PS_DFMT == FMT_24
     float Ad = 1.0f;
@@ -671,7 +680,7 @@ void ps_blend(inout vec4 Color, float As)
 
     // Let the compiler do its jobs !
     vec3 Cd = RT.rgb;
-    vec3 Cs = Color.rgb;
+#endif
 
 #if PS_BLEND_A == 0
     vec3 A = Cs;
@@ -713,7 +722,30 @@ void ps_blend(inout vec4 Color, float As)
 
     // PABE
 #if PS_PABE
-    Color.rgb = (As >= 1.0f) ? Color.rgb : Cs;
+    Color.rgb = (Color_pabe.a >= 128.0f) ? Color.rgb : Color_pabe.rgb;
+#endif
+
+    // Dithering
+    ps_dither(Color);
+
+    // Correct the Color value based on the output format
+#if PS_COLCLIP == 0 && PS_HDR == 0
+    // Standard Clamp
+    Color.rgb = clamp(Color.rgb, vec3(0.0f), vec3(255.0f));
+#endif
+
+    // FIXME rouding of negative float?
+    // compiler uses trunc but it might need floor
+
+    // Warning: normally blending equation is mult(A, B) = A * B >> 7. GPU have the full accuracy
+    // GS: Color = 1, Alpha = 255 => output 1
+    // GPU: Color = 1/255, Alpha = 255/255 * 255/128 => output 1.9921875
+#if PS_DFMT == FMT_16
+    // In 16 bits format, only 5 bits of colors are used. It impacts shadows computation of Castlevania
+
+    Color.rgb = vec3(ivec3(Color.rgb) & ivec3(0xF8));
+#elif PS_COLCLIP == 1 && PS_HDR == 0
+    Color.rgb = vec3(ivec3(Color.rgb) & ivec3(0xFF));
 #endif
 
 #endif
@@ -721,13 +753,22 @@ void ps_blend(inout vec4 Color, float As)
 
 void ps_main()
 {
+#if PS_DATE != 0
 #if ((PS_DATE & 3) == 1 || (PS_DATE & 3) == 2)
 
 #if PS_WRITE_RG == 1
     // Pseudo 16 bits access.
+#if HAS_FRAMEBUFFER_FETCH
+    float rt_a = LAST_FRAG_COLOR.g;
+#else
     float rt_a = texelFetch(RtSampler, ivec2(gl_FragCoord.xy), 0).g;
+#endif
+#else
+#if HAS_FRAMEBUFFER_FETCH
+    float rt_a = LAST_FRAG_COLOR.a;
 #else
     float rt_a = texelFetch(RtSampler, ivec2(gl_FragCoord.xy), 0).a;
+#endif
 #endif
 
 #if (PS_DATE & 3) == 1
@@ -758,19 +799,20 @@ void ps_main()
         discard;
     }
 #endif
+#endif
 
     vec4 C = ps_color();
 #if (APITRACE_DEBUG & 1) == 1
-    C.r = 255f;
+    C.r = 255.0f;
 #endif
 #if (APITRACE_DEBUG & 2) == 2
-    C.g = 255f;
+    C.g = 255.0f;
 #endif
 #if (APITRACE_DEBUG & 4) == 4
-    C.b = 255f;
+    C.b = 255.0f;
 #endif
 #if (APITRACE_DEBUG & 8) == 8
-    C.a = 128f;
+    C.a = 128.0f;
 #endif
 
 #if PS_SHUFFLE
@@ -844,17 +886,41 @@ void ps_main()
     return;
 #endif
 
+#if !SW_BLEND
+    ps_dither(C);
+#endif
+
     ps_blend(C, alpha_blend);
-
-    ps_dither(C.rgb);
-
-    // Color clamp/wrap needs to be done after sw blending and dithering
-    ps_color_clamp_wrap(C.rgb);
 
     ps_fbmask(C);
 
+// When dithering the bottom 3 bits become meaningless and cause lines in the picture
+// so we need to limit the color depth on dithered items
+// SW_BLEND already deals with this so no need to do in those cases
+#if !SW_BLEND && PS_DITHER && PS_DFMT == FMT_16 && PS_COLCLIP == 0
+    C.rgb = clamp(C.rgb, vec3(0.0f), vec3(255.0f));
+    C.rgb = vec3(uvec3(C.rgb) & uvec3(0xF8));
+#endif
+
+// #if PS_HDR == 1
+    // Use negative value to avoid overflow of the texture (in accumulation mode)
+    // Note: code were initially done for an Half-Float texture. Due to overflow
+    // the texture was upgraded to a full float. Maybe this code is useless now!
+    // Good testcase is castlevania
+    // if (any(greaterThan(C.rgb, vec3(128.0f)))) {
+        // C.rgb = (C.rgb - 256.0f);
+    // }
+// #endif
     SV_Target0 = C / 255.0f;
+#ifndef DISABLE_DUAL_SOURCE
     SV_Target1 = vec4(alpha_blend);
+#endif
+
+#if PS_BLEND_PREMULTIPLY == 1
+    SV_Target0.rgb *= alpha_blend;
+#elif PS_BLEND_PREMULTIPLY == 2
+    SV_Target0.rgb *= 1.0f - alpha_blend;
+#endif
 
 #if PS_ZCLAMP
 	gl_FragDepth = min(gl_FragCoord.z, MaxDepthPS);

@@ -1408,11 +1408,6 @@ SCED-51700:
   region: "PAL-M5"
   gameFixes:
     - VUKickstartHack # Fixes Character SPS.
-SCED-51922:
-  name: "Ghosthunter [Demo]"
-  region: "PAL-G"
-  clampModes:
-    vuClampMode: 3 # Fixes SPS.
 SCED-51935:
   name: "Official PlayStation 2 Magazine Demo 38" # German
   region: "PAL-E-G"
@@ -1741,13 +1736,6 @@ SCED-53325:
 SCED-53348:
   name: "Official PlayStation 2 Magazine Demo 58" # French
   region: "PAL-F"
-SCED-53679:
-  name: "Fire It Up Lads Demo"
-  region: "PAL-E"
-  patches:
-    default:
-      content: |-
-        comment=- WRC Rally needs XGKick fix enabled
 SCED-53684:
   name: "SingStar '80s [Demo]"
   region: "PAL-E"
@@ -1775,10 +1763,6 @@ SCED-54001:
 SCED-54024:
   name: "Official PlayStation 2 Magazine Demo 70"
   region: "PAL-M5"
-  patches:
-    default:
-      content: |-
-        comment=- Castlevania needs VU clamping none and EEclamping extra.
 SCED-54036:
   name: "Official PlayStation 2 Magazine Demo 69/70"
   region: "PAL-M5"
@@ -2112,7 +2096,7 @@ SCES-50494:
 SCES-50499:
   name: "Ecco the Dolphin - Defender of the Future"
   region: "PAL-M5"
-  compat: 5
+  compat: 2
   patches:
     7FEDF999:
       content: |-
@@ -2390,8 +2374,6 @@ SCES-51463:
   name: "Ghosthunter"
   region: "PAL-M6"
   compat: 5
-  clampModes:
-    vuClampMode: 3 # Fixes SPS.
   gameFixes:
     - VUKickstartHack # Fixes Missing Graphics.
 SCES-51480:
@@ -2511,7 +2493,12 @@ SCES-51719:
 SCES-51725:
   name: "Everquest Online Adventures"
   region: "PAL-M3"
-  compat: 4
+  compat: 3
+  patches:
+    555019B2:
+      content: |-
+        patch=0,EE,00571414,word,00000000
+        patch=0,EE,00571438,word,00000000
 SCES-51844:
   name: "Time Crisis 3"
   region: "PAL-M5"
@@ -2580,8 +2567,6 @@ SCES-52154:
 SCES-52156:
   name: "Ghosthunter - Hunter on the spectres"
   region: "PAL-M3"
-  clampModes:
-    vuClampMode: 3 # Fixes SPS.
 SCES-52268:
   name: "SingStar"
   region: "PAL-E"
@@ -3348,33 +3333,15 @@ SCES-54823:
 SCES-54844:
   name: "Buzz! The Hollywood Quiz"
   region: "PAL-E"
-  gameFixes:
-    - EETimingHack # Fixes long delays between questions.
 SCES-54845:
   name: "Buzz! The Hollywood Quiz"
   region: "PAL-G"
-  gameFixes:
-    - EETimingHack # Fixes long delays between questions.
 SCES-54848:
   name: "Buzz! Hollywood"
   region: "PAL-P-S"
-  gameFixes:
-    - EETimingHack # Fixes long delays between questions.
 SCES-54851:
   name: "Buzz! The Hollywood Quiz"
   region: "PAL-M3"
-  gameFixes:
-    - EETimingHack # Fixes long delays between questions.
-SCES-54852:
-  name: "Buzz! The Hollywood Quiz"
-  region: "PAL-F"
-  gameFixes:
-    - EETimingHack # Fixes long delays between questions.
-SCES-54856:
-  name: "Buzz! The Hollywood Quiz"
-  region: "PAL-P"
-  gameFixes:
-    - EETimingHack # Fixes long delays between questions.
 SCES-54869:
   name: "SingStar Italian Party"
   region: "PAL-I"
@@ -6704,8 +6671,6 @@ SCUS-97594:
   name: "Buzz! The Hollywood Quiz [Bundle]"
   region: "NTSC-U"
   compat: 5
-  gameFixes:
-    - EETimingHack # Fixes long delays between questions.
 SCUS-97596:
   name: "Buzz! Junior Jungle Party"
   region: "NTSC-U"
@@ -6778,8 +6743,6 @@ SCUS-97627:
 SCUS-97633:
   name: "Buzz! The Hollywood Quiz [Game Only]"
   region: "NTSC-U"
-  gameFixes:
-    - EETimingHack # Fixes long delays between questions.
 SCUS-97634:
   name: "Buzz! Jr. RoboJam [Game Only]"
   region: "NTSC-U"
@@ -7114,11 +7077,6 @@ SLED-52597:
 SLED-52875:
   name: "Sega Superstars [Demo]"
   region: "PAL-E"
-SLED-52890:
-  name: "FIFA 2005 [Demo]"
-  region: "PAL-M7"
-  gameFixes:
-    - GIFFIFOHack # Partially fixes graphical issues also needs EE cycle rate + 3.
 SLED-52929:
   name: "Prince of Persia - Warrior Within [Demo]"
   region: "PAL-M5"
@@ -7764,7 +7722,6 @@ SLES-50263:
 SLES-50264:
   name: "Playmobil - Hype - The Time Quest"
   region: "PAL-F"
-  compat: 5
   patches:
     B911D61B:
       content: |-
@@ -7788,7 +7745,6 @@ SLES-50264:
 SLES-50265:
   name: "Playmobil - Hype - The Time Quest"
   region: "PAL-G"
-  compat: 5
   patches:
     3D2A2448:
       content: |-
@@ -7812,7 +7768,7 @@ SLES-50265:
 SLES-50266:
   name: "Playmobil - Hype - The Time Quest"
   region: "PAL-M4"
-  compat: 5
+  compat: 4
   patches:
     F668693E:
       content: |-
@@ -8120,9 +8076,7 @@ SLES-50445:
 SLES-50446:
   name: "Shadow Man - 2econd Coming"
   region: "PAL-M4"
-  compat: 5
-  gameFixes:
-    - EETimingHack # Fixes cutscene freezes. 
+  compat: 4
   speedHacks:
     InstantVU1SpeedHack: 0  # Fixes SPS.
 SLES-50447:
@@ -8210,6 +8164,15 @@ SLES-50498:
 SLES-50503:
   name: "Weakest Link"
   region: "PAL-E"
+  patches:
+    7193F81D:
+      content: |-
+        comment=Patch by Prafull
+        // Fixes game hanging at start.
+        patch=1,EE,00195f38,word,00000000
+        patch=1,EE,001a2fbc,word,00000000
+        patch=1,EE,00198b68,word,00000000
+        patch=1,EE,00145b50,word,00000000
 SLES-50504:
   name: "Half-Life"
   region: "PAL-E"
@@ -8264,8 +8227,6 @@ SLES-50538:
 SLES-50539:
   name: "James Bond 007 - Agent Under Fire"
   region: "PAL-M6"
-  clampModes:
-    vuClampMode: 2 # Fixes corrupt textures. 
 SLES-50540:
   name: "Simpsons Road Rage"
   region: "PAL-E"
@@ -8381,9 +8342,6 @@ SLES-50606:
 SLES-50608:
   name: "Shadow Man - 2econd Coming"
   region: "PAL-G"
-  compat: 5
-  gameFixes:
-    - EETimingHack # Fixes cutscene freezes. 
   speedHacks:
     InstantVU1SpeedHack: 0  # Fixes SPS.
 SLES-50613:
@@ -8520,6 +8478,15 @@ SLES-50706:
 SLES-50709:
   name: "Weakest Link (Le Maillon Fable)"
   region: "PAL-F"
+  patches:
+    837321FA:
+      content: |-
+        comment=Patch by Prafull
+        // Fixes game hanging at start.
+        patch=1,EE,001980a8,word,00000000
+        patch=1,EE,001a512c,word,00000000
+        patch=1,EE,0019acd8,word,00000000
+        patch=1,EE,00147cc0,word,00000000
 SLES-50710:
   name: "Dr. Muto"
   region: "PAL-M5"
@@ -8697,8 +8664,6 @@ SLES-50788:
 SLES-50789:
   name: "Men in Black II: Alien Escape"
   region: "PAL-M5"
-  gameFixes:
-    - VIFFIFOHack # Needed to load the main game properly.
 SLES-50790:
   name: "International Superstar Soccer 2002"
   region: "PAL-M3"
@@ -8893,6 +8858,25 @@ SLES-50842:
 SLES-50843:
   name: "Crashed"
   region: "PAL-M5"
+  patches:
+    0379b4f7:
+      content: |-
+        comment=Patch by Prafull
+        // Fixes hanging at start.
+        patch=0,EE,00151898,word,00000000
+        // Fixes ingame hangs.
+        patch=0,EE,001518b0,word,00000000
+        patch=0,EE,001518c4,word,00000000
+        patch=0,EE,001518d8,word,00000000
+        patch=0,EE,001518ec,word,00000000
+        patch=0,EE,00151900,word,00000000
+        patch=0,EE,00151914,word,00000000
+        patch=0,EE,00151928,word,00000000
+        patch=0,EE,0015193C,word,00000000
+        patch=0,EE,00151950,word,00000000
+        patch=0,EE,00151968,word,00000000
+        patch=0,EE,00151978,word,00000000
+        patch=0,EE,00151914,word,00000000
 SLES-50845:
   name: "Medal of Honor: En Première Ligne"
   region: "PAL-F"
@@ -9389,8 +9373,6 @@ SLES-51113:
   name: "Zone of the Enders: The 2nd Runner Special Edition"
   region: "PAL-M5"
   compat: 5
-  gameFixes:
-    - DMABusyHack # Fixes the corrupted fade effect in cutscenes.
 SLES-51114:
   name: "Pro Evolution Soccer 2"
   region: "PAL-M5"
@@ -9753,6 +9735,13 @@ SLES-51282:
 SLES-51283:
   name: "WWE SmackDown! Shut Your Mouth"
   region: "PAL-E"
+  patches:
+    D1D97A29:
+      content: |-
+        comment=Patch by Prafull
+        // Fixes freeze during entrances.
+        patch=1,EE,0010b7ac,word,00000000 //0440fffa
+        patch=1,EE,0010b894,word,00000000 //0440fffa
 SLES-51284:
   name: "Contra - Shattered Soldier"
   region: "PAL-M3"
@@ -12021,8 +12010,6 @@ SLES-52541:
   name: "Grand Theft Auto - San Andreas"
   region: "PAL-M5"
   compat: 5
-  clampModes:
-    vuClampMode: 2 # Fixes Game freezes during "Reuniting The Families" mission.
 SLES-52542:
   name: "All Music Dance!"
   region: "PAL-I"
@@ -12066,28 +12053,18 @@ SLES-52558:
 SLES-52559:
   name: "FIFA 2005"
   region: "PAL-E"
-  gameFixes:
-    - GIFFIFOHack # Partially fixes graphical issues also needs EE cycle rate + 3.
 SLES-52560:
   name: "FIFA 2005"
   region: "PAL-G"
-  gameFixes:
-    - GIFFIFOHack # Partially fixes graphical issues also needs EE cycle rate + 3.
 SLES-52561:
   name: "FIFA 2005"
   region: "PAL-P-S"
-  gameFixes:
-    - GIFFIFOHack # Partially fixes graphical issues also needs EE cycle rate + 3.
 SLES-52562:
   name: "FIFA 2005"
   region: "PAL-I"
-  gameFixes:
-    - GIFFIFOHack # Partially fixes graphical issues also needs EE cycle rate + 3.
 SLES-52563:
   name: "FIFA Football 2005"
   region: "PAL-M6"
-  gameFixes:
-    - GIFFIFOHack # Partially fixes graphical issues also needs EE cycle rate + 3.
 SLES-52567:
   name: "Catwoman"
   region: "PAL-M7"
@@ -12097,7 +12074,6 @@ SLES-52568:
   compat: 5
   gameFixes:
     - XGKickHack # Fixes bad Geometry.
-    - VUKickstartHack # Fixes graphical glitches.
 SLES-52569:
   name: "Spyro - A Hero's Tail"
   region: "PAL-M6"
@@ -12825,8 +12801,6 @@ SLES-52922:
 SLES-52927:
   name: "Grand Theft Auto - San Andreas"
   region: "PAL-G"
-  clampModes:
-    vuClampMode: 2 # Fixes Game freezes during "Reuniting The Families" mission.
 SLES-52931:
   name: "Legend of Kay"
   region: "PAL-M5"
@@ -13152,7 +13126,7 @@ SLES-53037:
   region: "PAL-M5"
   compat: 5
   roundModes:
-    eeRoundMode: 1  # Fixes object balls never stopping in the Monkey Billiards DX minigame.
+    eeRoundMode: 0  # Fixes object balls never stopping in the Monkey Billiards DX minigame.
 SLES-53038:
   name: "Devil May Cry 3 - Dante's Awakening"
   region: "PAL-M5"
@@ -13300,12 +13274,6 @@ SLES-53104:
 SLES-53106:
   name: "MX vs. ATV Unleashed"
   region: "PAL-E"
-  patches:
-    D7AE31F4:
-      content: |-
-        comment=Rearranging COP2 ops to avoid clip flag resonse. Fixes SPS.
-        patch=1,EE,001B0138,word,484E9000
-        patch=1,EE,001B013C,word,4BDBD9FF
 SLES-53107:
   name: "Cabela's Big Game Hunter 2005 Adventures"
   region: "PAL-E"
@@ -14795,14 +14763,6 @@ SLES-53805:
 SLES-53809:
   name: "K-1 Premium Dynamite!!"
   region: "PAL-E"
-  gameFixes:
-    - XGKickHack # Fixes black and white fighters.
-  patches:
-    B6F9C8D3:
-      content: |-
-        comment=Fixes black screen in hardware mode.
-        patch=1,EE,0030a420,word,0000948c
-        patch=1,EE,0030a448,word,0000948c
 SLES-53810:
   name: "Sensible Soccer 2006"
   region: "PAL-M5"
@@ -16720,13 +16680,9 @@ SLES-54723:
   name: "Spider-Man 3"
   region: "PAL-E"
   compat: 4
-  clampModes:
-    vuClampMode: 0 # Fixes idle camera behaviour.
 SLES-54724:
   name: "Spider-Man 3"
   region: "PAL-M4"
-  clampModes:
-    vuClampMode: 0 # Fixes idle camera behaviour.
 SLES-54725:
   name: "Kirikou and the Wild Beasts"
   region: "PAL-M5"
@@ -16816,15 +16772,11 @@ SLES-54767:
 SLES-54770:
   name: "DreamWorks Shrek the Third"
   region: "PAL-E"
-  roundModes:
-    vuRoundMode: 0  # Fixes black zones.
   clampModes:
     eeClampMode: 3  # Fixes objects spawning.
 SLES-54771:
   name: "DreamWorks Shrek the Third"
   region: "PAL-M5"
-  roundModes:
-    vuRoundMode: 0  # Fixes black zones.
   clampModes:
     eeClampMode: 3  # Fixes objects spawning.
 SLES-54772:
@@ -16832,8 +16784,6 @@ SLES-54772:
   region: "PAL-E"
 SLES-54774:
   name: "DreamWorks Shrek the Third"
-  roundModes:
-    vuRoundMode: 0  # Fixes black zones.
   region: "PAL-M5"
   clampModes:
     eeClampMode: 3  # Fixes objects spawning.
@@ -18703,30 +18653,16 @@ SLES-82037:
     - "SLES-82036"
     - "SLES-82037"
 SLES-82038:
-  name: "Onimusha - Dawn of Dreams [Disc1of2]"
+  name: "Onimusha - Dawn of Dreams [Disc1]"
   region: "PAL-M5"
   compat: 5
   patches:
     812C5A96:
       content: |-
-        comment=patched by Kozarrov and ported by Prafull
-        //Improve menus, and other 2D displays handled on IPU
-        // Set IPU_DATA IVF to Intra
-        patch=1,EE,003c3678,word,3C040020
-        // Set IPU_CMD to IDEC, and set QSC to 2
-        // Why 2? Because it seems to work best.
-        patch=1,EE,003c368c,word,3C021002
-        // Old patch by shadow lady (still needed)
-        patch=1,EE,00104170,word,00000000
-        // Disable print - we need that loop!
-        // Without loop ipu break itself.
-        patch=1,EE,0010FDC8,word,34190180
-        patch=1,EE,0010FDCC,word,1720FFFF
-        patch=1,EE,0010FDD0,word,2739FFFF
-        patch=1,EE,0010FDD4,word,03E00008
-        patch=1,EE,0010FDD8,word,00000000
+        comment=Patch by Shadow Lady
+        patch=0,EE,00104170,word,00000000
 SLES-82039:
-  name: "Onimusha - Dawn of Dreams [Disc2of2]"
+  name: "Onimusha - Dawn of Dreams [Disc2]"
   region: "PAL-M5"
   compat: 5
   memcardFilters:
@@ -18734,22 +18670,8 @@ SLES-82039:
   patches:
     812C5A96:
       content: |-
-        comment=patched by Kozarrov and ported by Prafull
-        //Improve menus, and other 2D displays handled on IPU
-        // Set IPU_DATA IVF to Intra
-        patch=1,EE,003c3678,word,3C040020
-        // Set IPU_CMD to IDEC, and set QSC to 2
-        // Why 2? Because it seems to work best.
-        patch=1,EE,003c368c,word,3C021002
-        // Old patch by shadow lady (still needed)
-        patch=1,EE,00104170,word,00000000
-        // Disable print - we need that loop!
-        // Without loop ipu break itself.
-        patch=1,EE,0010FDC8,word,34190180
-        patch=1,EE,0010FDCC,word,1720FFFF
-        patch=1,EE,0010FDD0,word,2739FFFF
-        patch=1,EE,0010FDD4,word,03E00008
-        patch=1,EE,0010FDD8,word,00000000
+        comment=Patch by Shadow Lady
+        patch=0,EE,00104170,word,00000000
 SLES-82042:
   name: "Metal Gear Solid 3 - Subsistence [Disc1of3]"
   region: "PAL-E-F"
@@ -18859,14 +18781,16 @@ SLKA-25026:
   region: "NTSC-K"
   clampModes:
     vuClampMode: 2  # Fixes SPS in item menu.
-SLKA-25029:
-  name: "MVP Baseball 2003"
-  region: "NTSC-K"
-  clampModes:
-    vuClampMode: 3  # Fixes missing environment.
 SLKA-25030:
   name: "WWE SmackDown! Shut Your Mouth"
   region: "NTSC-K"
+  patches:
+    43E396A7:
+      content: |-
+        comment=Patch by Prafull and Arapapa
+        // Fixes freeze during entrances.
+        patch=1,EE,0010b894,word,00000000
+        patch=1,EE,0010b7ac,word,00000000
 SLKA-25032:
   name: "Enter the Matrix"
   region: "NTSC-K"
@@ -19115,11 +19039,6 @@ SLKA-25207:
 SLKA-25208:
   name: "From TV Animation - One Piece - Round the Land!"
   region: "NTSC-K"
-SLKA-25209:
-  name: "FIFA 2005"
-  region: "NTSC-K"
-  gameFixes:
-    - GIFFIFOHack # Partially fixes graphical issues also needs EE cycle rate + 3.
 SLKA-25213:
   name: "Berserk"
   region: "NTSC-K"
@@ -19270,7 +19189,7 @@ SLKA-25290:
   name: "Super Monkey Ball Deluxe"
   region: "NTSC-K"
   roundModes:
-    eeRoundMode: 1  # Fixes object balls never stopping in the Monkey Billiards DX minigame.
+    eeRoundMode: 0  # Fixes object balls never stopping in the Monkey Billiards DX minigame.
 SLKA-25291:
   name: "Chains of Power"
   region: "NTSC-K"
@@ -19411,8 +19330,6 @@ SLKA-25384:
 SLKA-25385:
   name: "Spider-Man 3"
   region: "NTSC-K"
-  clampModes:
-    vuClampMode: 0 # Fixes idle camera behaviour.
 SLKA-25388:
   name: "One Piece - Grand Adventure"
   region: "NTSC-K"
@@ -19446,7 +19363,7 @@ SLKA-25413:
 SLKA-25422:
   name: "Silent Hill - Origins"
   region: "NTSC-K"
-  compat: 5
+  compat: 4
 SLKA-25424:
   name: "SNK Arcade Classics Vol.1"
   region: "NTSC-K"
@@ -19520,11 +19437,6 @@ SLPM-55081:
   region: "NTSC-J"
   clampModes:
     eeClampMode: 2  # Fixes wrong color on some characters and breakable objects.
-SLPM-55092:
-  name: "Grand Theft Auto - San Andreas [Best Price]"
-  region: "NTSC-J"
-  clampModes:
-    vuClampMode: 2 # Fixes Game freezes during "Reuniting The Families" mission.
 SLPM-55096:
   name: "ThunderForce VI"
   region: "NTSC-J"
@@ -19645,17 +19557,21 @@ SLPM-55283:
 SLPM-55285:
   name: "Crimson Empire"
   region: "NTSC-J"
-SLPM-55292:
-  name: "Grand Theft Auto - San Andreas [Rockstar Classics]"
-  region: "NTSC-J"
-  clampModes:
-    vuClampMode: 2 # Fixes Game freezes during "Reuniting The Families" mission.
 SLPM-60101:
   name: "0 Story"
   region: "NTSC-J"
 SLPM-60102:
   name: "From Software First Previews"
   region: "NTSC-J"
+  patches:
+    9E9AC9DC:
+      content: |-
+        author=kozarovv
+        // Patch for From Software First Preview, Evergrace demo. 
+        // Fix loading. Expected data is 2 bytes later than game trying to read it. 
+        // Patch force read from address where data is.
+        patch=1,EE,E0018447,extended,0023BB86
+        patch=1,EE,0023BB84,extended,00000006
 SLPM-60104:
   name: "Konami PlayStation 2 Taikeban"
   region: "NTSC-J"
@@ -19685,27 +19601,12 @@ SLPM-60254:
 SLPM-60256:
   name: "Dengeki D73 demo"
   region: "NTSC-J"
-SLPM-60260:
-  name: "D1 Professional Drift Grand Prix Series [Taikenban]"
-  region: "NTSC-J"
-  clampModes:
-    eeClampMode: 3 # Fixes black void.
 SLPM-60262:
   name: "10th Anniversary Memorial Save Data [Disc 2]"
   region: "NTSC-J"
 SLPM-60265:
   name: "10th Anniversary PlayStation & PlayStation 2 All-Soft Catalogue Special SaveData Collection [PS2 Disc]"
   region: "NTSC-J"
-SLPM-60270:
-  name: "D1 Professional Drift Grand Prix Series 2005 [Trial]"
-  region: "NTSC-J"
-  clampModes:
-    eeClampMode: 3 # Fixes black screen.
-SLPM-60271:
-  name: "D1 Professional Drift Grand Prix Series 2005 [Trial]"
-  region: "NTSC-J"
-  clampModes:
-    eeClampMode: 3 # Fixes black screen.
 SLPM-60273:
   name: "Zettai Zetsumei Toshi 2: Itetsuita Kioku-tachi [Trial B]"
   region: "NTSC-J"
@@ -21160,14 +21061,6 @@ SLPM-62580:
 SLPM-62581:
   name: "K-1 Premium 2004 - Fighting Dynamite!!"
   region: "NTSC-J"
-  gameFixes:
-    - XGKickHack # Fixes black and white fighters.
-  patches:
-    0A1042EE:
-      content: |-
-        comment=Fixes black screen in hardware mode.
-        patch=1,EE,00301de0,word,0000948c
-        patch=1,EE,00301e08,word,0000948c
 SLPM-62582:
   name: "Slotter-Up Core 6"
   region: "NTSC-J"
@@ -24345,8 +24238,6 @@ SLPM-65862:
 SLPM-65863:
   name: "D1 Grand Prix Series - Professional Drift"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 3 # Fixes black void.
 SLPM-65864:
   name: "Nobunaga no Yabou - Tenka Sousei [with Power-Up Kit]"
   region: "NTSC-J"
@@ -24481,7 +24372,7 @@ SLPM-65909:
   name: "Super Monkey Ball Deluxe"
   region: "NTSC-J"
   roundModes:
-    eeRoundMode: 1  # Fixes object balls never stopping in the Monkey Billiards DX minigame.
+    eeRoundMode: 0  # Fixes object balls never stopping in the Monkey Billiards DX minigame.
 SLPM-65910:
   name: "Cafe Lindbergh - Summer Season [Sweet Box]"
   region: "NTSC-J"
@@ -24712,8 +24603,6 @@ SLPM-65982:
 SLPM-65984:
   name: "Grand Theft Auto - San Andreas"
   region: "NTSC-J"
-  clampModes:
-    vuClampMode: 2 # Fixes Game freezes during "Reuniting The Families" mission.
 SLPM-65985:
   name: "Iris no Atelier: Eternal Mana 2"
   region: "NTSC-J"
@@ -24997,14 +24886,6 @@ SLPM-66077:
   name: "K-1 World Max 2005"
   region: "NTSC-J"
   compat: 5
-  gameFixes:
-    - XGKickHack # Fixes black and white fighters.
-  patches:
-    08E3C435:
-      content: |-
-        comment=Fixes black screen in hardware mode.
-        patch=1,EE,003dfe60,word,0000948c
-        patch=1,EE,003dfe88,word,0000948c
 SLPM-66078:
   name: "White Princess the Second"
   region: "NTSC-J"
@@ -25193,8 +25074,6 @@ SLPM-66143:
 SLPM-66144:
   name: "D1 Grand Prix 2005"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 3 # Fixes black screen.
 SLPM-66145:
   name: "GoldenEye - Rogue Agent [EA Best Hits]"
   region: "NTSC-J"
@@ -25246,15 +25125,8 @@ SLPM-66160:
   roundModes:
     eeRoundMode: 0
 SLPM-66163:
-  name: "Fuuraiki 2"
+  name: "Fuuuraiki 2"
   region: "NTSC-J"
-  patches:
-    FDF6D8C2:
-      content: |-
-        author=Prafull
-        // Skip sceipusync
-        // Fixes hang before going ingame
-        patch=1,EE,002324dc,word,00000000
 SLPM-66164:
   name: "Mahou Tsukai Kurohime"
   region: "NTSC-J"
@@ -25885,8 +25757,6 @@ SLPM-66356:
 SLPM-66358:
   name: "Shinobido Takumi"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 3 # Fixes crash after main menu. 
 SLPM-66359:
   name: "Mutsu-boshi Kirari - Hoshifuru Miyako"
   region: "NTSC-J"
@@ -26201,15 +26071,8 @@ SLPM-66457:
         // This patch skips over the stack code, allowing the game to boot.
         patch=1,EE,001579D8,word,10000003
 SLPM-66458:
-  name: "Fuuraiki"
+  name: "Acheter Fuuuraiki"
   region: "NTSC-J"
-  patches:
-    37CA944E:
-      content: |-
-        author=Prafull
-        // Skip sceipusync
-        // Fixes hang before going ingame
-        patch=1,EE,0023122c,word,00000000
 SLPM-66459:
   name: "Zero Pilot - Zero"
   region: "NTSC-J"
@@ -27115,17 +26978,10 @@ SLPM-66736:
   name: "Rogue Hearts Dungeon"
   region: "NTSC-J"
 SLPM-66737:
-  name: "Ouran Koukou Host Club [Limited Edition]"
+  name: "Roeran koekoe Host Club [Limited Edition]"
   region: "NTSC-J"
-  patches:
-    3BE2C709:
-      content: |-
-        author=PSI, Prafull
-        // Game does weird stack manipulation, causing data sent to the IOP to be corrupted unless EE data cache is enabled.
-        // This patch skips over the stack code, allowing the game to boot.
-        patch=1,EE,00189e88,word,10000003
 SLPM-66738:
-  name: "Ouran Koukou Host Club"
+  name: "Roeran koekoe Host Club"
   region: "NTSC-J"
   patches:
     3BE2C709:
@@ -27297,8 +27153,6 @@ SLPM-66787:
 SLPM-66788:
   name: "Grand Theft Auto - San Andreas [Best Price]"
   region: "NTSC-J"
-  clampModes:
-    vuClampMode: 2 # Fixes Game freezes during "Reuniting The Families" mission.
 SLPM-66789:
   name: "Grand Theft Auto III [Best Price]"
   region: "NTSC-J"
@@ -27913,12 +27767,6 @@ SLPM-67502:
   name: "Devil May Cry"
   region: "NTSC-K"
   compat: 5
-SLPM-67505:
-  name: "James Bond 007 - Agent Under Fire"
-  region: "NTSC-K"
-  compat: 5
-  clampModes:
-    vuClampMode: 2 # Fixes corrupt textures.
 SLPM-67507:
   name: "Onimusha Warlords"
   region: "NTSC-K"
@@ -29143,12 +28991,6 @@ SLPS-20453:
   compat: 5
   gameFixes:
     - XGKickHack # Fixes black and white fighters.
-  patches:
-    602B7A48:
-      content: |-
-        comment=Fixes black screen in hardware mode.
-        patch=1,EE,00336a20,word,0000948c
-        patch=1,EE,00336a48,word,0000948c
 SLPS-20454:
   name: "Simple 2000 Series Vol.93 - The Right Brain Drill"
   region: "NTSC-J"
@@ -30091,8 +29933,6 @@ SLPS-25250:
 SLPS-25251:
   name: "MVP Baseball 2003"
   region: "NTSC-J"
-  clampModes:
-    vuClampMode: 3  # Fixes missing environment.
 SLPS-25252:
   name: "Star wars - Jango Fett"
   region: "NTSC-J"
@@ -31166,14 +31006,6 @@ SLPS-25577:
 SLPS-25578:
   name: "K-1 World Grand Prix 2005"
   region: "NTSC-J"
-  gameFixes:
-    - XGKickHack # Fixes black and white fighters.
-  patches:
-    F8664E20:
-      content: |-
-        comment=Fixes black screen in hardware mode.
-        patch=1,EE,004269f0,word,0000948c
-        patch=1,EE,00426a18,word,0000948c
 SLPS-25579:
   name: "Little Aid"
   region: "NTSC-J"
@@ -32050,8 +31882,6 @@ SLPS-25822:
 SLPS-25823:
   name: "Spider-Man 3"
   region: "NTSC-J"
-  clampModes:
-    vuClampMode: 0 # Fixes idle camera behaviour.
 SLPS-25825:
   name: "Zero no Tsukaima [Best Collection]"
   region: "NTSC-J"
@@ -33764,8 +33594,6 @@ SLUS-20265:
   name: "James Bond 007 - Agent Under Fire"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vuClampMode: 2 # Fixes corrupt textures. 
 SLUS-20266:
   name: "NASCAR - Thunder 2002"
   region: "NTSC-U"
@@ -33844,7 +33672,7 @@ SLUS-20281:
 SLUS-20282:
   name: "Victorious Boxers - Ippo's Road to Glory"
   region: "NTSC-U"
-  compat: 5
+  compat: 4
 SLUS-20283:
   name: "World of Outlaws - Sprint Cars 2002"
   region: "NTSC-U"
@@ -34011,6 +33839,26 @@ SLUS-20323:
   name: "Virtua Fighter 4"
   region: "NTSC-U"
   compat: 5
+  patches:
+    EA131B57:
+      content: |-
+        author=kozarovv
+        // Fix for Virtua Fighter 4 SLUS-20323 hang while loading replays.
+        // Game interrupt required data read if break command is done too early.
+        // Hard to tell that it works by luck on PS2, or maybe something is missing on pcsx2 side.
+        // Also workaround to https://github.com/PCSX2/pcsx2/issues/2009. 
+        // Note: CDVD Break is used only in a few places in that title, all of them break without patch.
+        // Delay Break CDVD command
+        // Fix replays / A.I replays loading
+        patch=1,IOP,0003d010,word,0807fff9
+        patch=1,IOP,0003d014,word,3c020004
+        patch=1,IOP,001fffe4,word,24180016
+        patch=1,IOP,001fffe8,word,14980003
+        patch=1,IOP,001fffec,word,3c190010
+        patch=1,IOP,001ffff0,word,1720ffff
+        patch=1,IOP,001ffff4,word,2739ffff
+        patch=1,IOP,001ffff8,word,0800f406
+        patch=1,IOP,001ffffc,word,8c42e36c
 SLUS-20324:
   name: "Paris Dakar Rally"
   region: "NTSC-U"
@@ -34188,6 +34036,14 @@ SLUS-20369:
   name: "Knockout Kings 2002"
   region: "NTSC-U"
   compat: 5
+  patches:
+    36feee3a:
+      content: |-
+        author=Prafull
+        // Fixes Hanging at start of fight.
+        patch=1,EE,001d7fec,word,1000000f
+        patch=1,EE,001d8020,word,1000000f
+        patch=1,EE,001d8074,word,1000000f
 SLUS-20370:
   name: "Kingdom Hearts"
   region: "NTSC-U"
@@ -34304,7 +34160,7 @@ SLUS-20393:
 SLUS-20394:
   name: "Ecco the Dolphin - Defender of the Future"
   region: "NTSC-U"
-  compat: 5
+  compat: 2
   patches:
     B78EAA30:
       content: |-
@@ -34385,9 +34241,7 @@ SLUS-20412:
 SLUS-20413:
   name: "Shadow Man - 2econd Coming"
   region: "NTSC-U"
-  compat: 5
-  gameFixes:
-    - EETimingHack # Fixes cutscene freezes. 
+  compat: 4
   speedHacks:
     InstantVU1SpeedHack: 0  # Fixes SPS.
 SLUS-20414:
@@ -34691,6 +34545,13 @@ SLUS-20483:
   name: "WWE SmackDown! Shut Your Mouth"
   region: "NTSC-U"
   compat: 5
+  patches:
+    B0AE1898:
+      content: |-
+        comment=Patch by Prafull
+        // Fixes freeze during entrances.
+        patch=1,EE,0010b894,word,00000000
+        patch=1,EE,0010b7ac,word,00000000
 SLUS-20484:
   name: "Devil May Cry 2 [Disc1of2]"
   region: "NTSC-U"
@@ -35403,8 +35264,6 @@ SLUS-20649:
 SLUS-20650:
   name: "MVP Baseball 2003"
   region: "NTSC-U"
-  clampModes:
-    vuClampMode: 3  # Fixes missing environment. 
 SLUS-20651:
   name: "NBA Street Vol. 2"
   region: "NTSC-U"
@@ -35772,7 +35631,7 @@ SLUS-20743:
 SLUS-20744:
   name: "EverQuest - Online Adventures - Frontiers"
   region: "NTSC-U"
-  compat: 4
+  compat: 3
 SLUS-20745:
   name: "Shrek 2"
   region: "NTSC-U"
@@ -36444,7 +36303,6 @@ SLUS-20909:
   compat: 5
   gameFixes:
     - XGKickHack # Fixes bad geometry.
-    - VUKickstartHack # Fixes graphical glitches.
 SLUS-20910:
   name: "Test Drive - Eve of Destruction"
   region: "NTSC-U"
@@ -36483,7 +36341,7 @@ SLUS-20918:
   region: "NTSC-U"
   compat: 5
   roundModes:
-    eeRoundMode: 1  # Fixes object balls never stopping in the Monkey Billiards DX minigame.
+    eeRoundMode: 0  # Fixes object balls never stopping in the Monkey Billiards DX minigame.
 SLUS-20919:
   name: "ESPN - NFL 2K5"
   region: "NTSC-U"
@@ -36616,8 +36474,6 @@ SLUS-20946:
   name: "Grand Theft Auto - San Andreas"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vuClampMode: 2 # Fixes Game freezes during "Reuniting The Families" mission.
 SLUS-20947:
   name: "WinBack 2: Project Poseidon"
   region: "NTSC-U"
@@ -37147,8 +37003,6 @@ SLUS-21051:
   name: "FIFA 2005"
   region: "NTSC-U"
   compat: 5
-  gameFixes:
-    - GIFFIFOHack # Partially fixes graphical issues also needs EE cycle rate + 3.
 SLUS-21052:
   name: "Disney's Monsters Inc."
   region: "NTSC-U"
@@ -37346,12 +37200,6 @@ SLUS-21104:
   name: "MX vs. ATV Unleashed"
   region: "NTSC-U"
   compat: 5
-  patches:
-    95BB1901:
-      content: |-
-        comment=Rearranging COP2 ops to avoid clip flag resonse. Fixes SPS.
-        patch=1,EE,001b0458,word,484E9000
-        patch=1,EE,001b045c,word,4BDBD9FF
 SLUS-21105:
   name: "Tom Clancy's Ghost Recon 2"
   region: "NTSC-U"
@@ -37673,21 +37521,8 @@ SLUS-21180:
   patches:
     FE44479E:
       content: |-
-       author=kozarovv
-       // Set IPU_DATA IVF to Intra
-       patch=1,EE,003BFDD8,word,3C040020
-       // Set IPU_CMD to IDEC, and set QSC to 2
-       // Why 2? Because it seems to work best.
-       patch=1,EE,003BFDEC,word,3C021002
-       // Old patch by shadow lady (still needed)
-       patch=1,EE,00104170,word,00000000
-       // Disable print - we need that loop!
-       // Without loop ipu break itself.
-       patch=1,EE,0010FDC8,word,34190180
-       patch=1,EE,0010FDCC,word,1720FFFF
-       patch=1,EE,0010FDD0,word,2739FFFF
-       patch=1,EE,0010FDD4,word,03E00008
-       patch=1,EE,0010FDD8,word,00000000
+        comment=Patch by Shadow Lady
+        patch=0,EE,00104170,word,00000000
 SLUS-21181:
   name: "D.I.C.E.: DNA Integrated Cybernetic Enterprises"
   region: "NTSC-U"
@@ -38349,8 +38184,6 @@ SLUS-21322:
   name: "Eragon"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vuClampMode: 3 # Fixes SPS and spawn issues.
 SLUS-21323:
   name: "Rampage - Total Destruction"
   region: "NTSC-U"
@@ -38795,8 +38628,6 @@ SLUS-21416:
   name: "D1 Grand Prix"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    eeClampMode: 3 # Fixes black screen.
 SLUS-21417:
   name: "Xenosaga - Episode III - Also Sprach Zarathustra [Disc2of2]"
   region: "NTSC-U"
@@ -38989,8 +38820,6 @@ SLUS-21454:
   name: "DreamWorks Shrek the Third"
   region: "NTSC-U"
   compat: 5
-  roundModes:
-    vuRoundMode: 0  # Fixes black zones.
   clampModes:
     eeClampMode: 3  # Fixes objects spawning.
 SLUS-21455:
@@ -39293,8 +39122,6 @@ SLUS-21552:
   name: "Spider-Man 3"
   region: "NTSC-U"
   compat: 4
-  clampModes:
-    vuClampMode: 0 # Fixes idle camera behaviour.
 SLUS-21553:
   name: "Lumines Plus"
   region: "NTSC-U"
@@ -39574,11 +39401,6 @@ SLUS-21616:
   compat: 5
   roundModes:
     vuRoundMode: 0
-SLUS-21617:
-  name: "Spiderman 3"
-  region: "NTSC-U"
-  clampModes:
-    vuClampMode: 0 # Fixes idle camera behaviour.
 SLUS-21618:
   name: "Plan, The"
   region: "NTSC-U"
@@ -39881,10 +39703,6 @@ SLUS-21689:
   name: "Petz - Horsez 2"
   region: "NTSC-U"
   compat: 4
-  patches:
-    default:
-      content: |-
-        comment= Horsez 2 needs EE cycle rate +2 or +3.
   gameFixes:
     - VUKickstartHack # Fixes SPS.
 SLUS-21690:

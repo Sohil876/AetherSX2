@@ -1661,5 +1661,9 @@
 #define wxUSE_CRASHREPORT 1
 /* --- end MSW options --- */
 
+#ifdef _M_ARM64
+#define wxUSE_DBGHELP 0
+#endif
+
 #endif // _WX_SETUP_H_
 

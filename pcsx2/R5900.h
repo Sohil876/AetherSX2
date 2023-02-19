@@ -171,7 +171,10 @@ struct cpuRegisters {
 	u32 interrupt;
 	int branch;
 	int opmode;			// operating mode
-	u32 tempcycles;
+
+	// if cycle is greater than this cycle, should check cpuEventTest for updates
+	u32 nextEventCycle;
+	u32 pcWriteback;
 };
 
 // used for optimization
@@ -253,11 +256,10 @@ struct tlbs
 
 #endif
 
-alignas(16) extern cpuRegisters cpuRegs;
-alignas(16) extern fpuRegisters fpuRegs;
-alignas(16) extern tlbs tlb[48];
+extern __aligned16 cpuRegisters cpuRegs;
+extern __aligned16 fpuRegisters fpuRegs;
+extern __aligned16 tlbs tlb[48];
 
-extern u32 g_nextEventCycle;
 extern bool eeEventTestIsActive;
 extern u32 s_iLastCOP0Cycle;
 extern u32 s_iLastPERFCycle[2];

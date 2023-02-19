@@ -78,10 +78,12 @@ NetAdapter* GetNetAdapter()
 			na = static_cast<NetAdapter*>(new TAPAdapter());
 			break;
 #endif
+#ifndef __ANDROID__
 		case NetApi::PCAP_Bridged:
 		case NetApi::PCAP_Switched:
 			na = static_cast<NetAdapter*>(new PCAPAdapter());
 			break;
+#endif
 		default:
 			return 0;
 	}

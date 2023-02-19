@@ -26,7 +26,6 @@ private:
 	int m_height;
 	int m_custom_width;
 	int m_custom_height;
-	bool m_reset;
 	int m_upscale_multiplier;
 	int m_userhacks_ts_half_bottom;
 
@@ -84,11 +83,11 @@ private:
 		};
 
 		template <class T>
-		class FunctionMap : public GSFunctionMap<u32, T>
+		class FunctionMap : public GSFunctionMap<uint32, T>
 		{
 			std::list<HackEntry<T>>& m_tbl;
 
-			T GetDefaultFunction(u32 key)
+			T GetDefaultFunction(uint32 key)
 			{
 				CRC::Title title = (CRC::Title)(key & 0xffffff);
 				CRC::Region region = (CRC::Region)(key >> 24);
@@ -132,7 +131,7 @@ private:
 
 #pragma endregion
 
-	u16 Interpolate_UV(float alpha, int t0, int t1);
+	uint16 Interpolate_UV(float alpha, int t0, int t1);
 	float alpha0(int L, int X0, int X1);
 	float alpha1(int L, int X0, int X1);
 	void SwSpriteRender();
@@ -160,21 +159,22 @@ protected:
 	int m_sw_blending;
 
 	bool m_channel_shuffle;
+	bool m_reset;
 
 	GSVector2i m_lod; // Min & Max level of detail
 	void CustomResolutionScaling();
 
 public:
-	GSRendererHW();
+	GSRendererHW(std::unique_ptr<GSDevice> dev, GSTextureCache* tc);
 	virtual ~GSRendererHW();
 
-	void SetGameCRC(u32 crc, int options);
+	void SetGameCRC(uint32 crc, int options);
 	bool CanUpscale();
 	int GetUpscaleMultiplier();
 	GSVector2i GetCustomResolution();
 	void SetScaling();
 	void Lines2Sprites();
-	void EmulateAtst(GSVector4& FogColor_AREF, u8& atst, const bool pass_2);
+	void EmulateAtst(GSVector4& FogColor_AREF, uint8& atst, const bool pass_2);
 	void ConvertSpriteTextureShuffle(bool& write_ba, bool& read_ba);
 	GSVector4 RealignTargetTextureCoordinate(const GSTextureCache::Source* tex);
 	GSVector4i ComputeBoundingBox(const GSVector2& rtscale, const GSVector2i& rtsize);
@@ -182,7 +182,7 @@ public:
 
 	void Reset();
 	void VSync(int field);
-	void ResetDevice();
+
 	GSTexture* GetOutput(int i, int& y_offset);
 	GSTexture* GetFeedbackOutput();
 	void InvalidateVideoMem(const GIFRegBITBLTBUF& BITBLTBUF, const GSVector4i& r);

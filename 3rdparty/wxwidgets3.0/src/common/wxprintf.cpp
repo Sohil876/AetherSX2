@@ -116,7 +116,11 @@ static int wxDoVsnprintf(CharType *buf, size_t lenMax,
     // copy to be able to pass it to LoadArg as a reference.
     bool ok = true;
     va_list ap;
+#ifdef __ANDROID__
+		va_copy(ap, argptr);
+#else
     wxVaCopy(ap, argptr);
+#endif
 
     // now load arguments from stack
     for (i=0; i < parser.nargs && ok; i++)

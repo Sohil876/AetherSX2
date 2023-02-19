@@ -72,7 +72,7 @@ bool ChdFileReader::Open2(std::string fileName)
 
 	while (CHDERR_REQUIRES_PARENT == (error = chd_open_wrapper(chds[chd_depth].c_str(), &fp, CHD_OPEN_READ, NULL, &child)))
 	{
-		if (chd_depth >= static_cast<int>(std::size(chds) - 1))
+		if (chd_depth >= static_cast<int>(ArraySize(chds) - 1))
 		{
 			Console.Error("CDVD: chd_open hit recursion limit searching for parents");
 			return false;

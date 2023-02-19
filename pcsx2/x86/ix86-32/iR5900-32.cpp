@@ -34,6 +34,7 @@
 
 #include "DebugTools/Breakpoints.h"
 #include "Patch.h"
+#include "VMManager.h"
 
 #if !PCSX2_SEH
 	#include "common/FastJmp.h"
@@ -50,8 +51,8 @@ using namespace R5900;
 #define PC_GETBLOCK(x) PC_GETBLOCK_(x, recLUT)
 
 u32 maxrecmem = 0;
-alignas(16) static uptr recLUT[_64kb];
-alignas(16) static u32 hwLUT[_64kb];
+static __aligned16 uptr recLUT[_64kb];
+static __aligned16 u32 hwLUT[_64kb];
 
 static __fi u32 HWADDR(u32 mem) { return hwLUT[mem >> 16] + mem; }
 
@@ -60,7 +61,7 @@ u32 s_nBlockCycles = 0; // cycles of current block recompiling
 u32 pc;       // recompiler pc
 int g_branch; // set for branch
 
-alignas(16) GPR_reg64 g_cpuConstRegs[32] = {0};
+__aligned16 GPR_reg64 g_cpuConstRegs[32] = {0};
 u32 g_cpuHasConstReg = 0, g_cpuFlushedConstReg = 0;
 bool g_cpuFlushedPC, g_cpuFlushedCode, g_recompilingDelaySlot, g_maySignalException;
 
@@ -335,7 +336,7 @@ void recBranchCall(void (*func)())
 	// to the current cpu cycle.
 
 	xMOV(eax, ptr[&cpuRegs.cycle]);
-	xMOV(ptr[&g_nextEventCycle], eax);
+	xMOV(ptr[&cpuRegs.nextEventCycle], eax);
 
 	recCall(func);
 	g_branch = 2;
@@ -356,7 +357,7 @@ static void __fastcall dyna_block_discard(u32 start, u32 sz);
 static void __fastcall dyna_page_reset(u32 start, u32 sz);
 
 // Recompiled code buffer for EE recompiler dispatchers!
-alignas(__pagesize) static u8 eeRecDispatchers[__pagesize];
+static u8 __pagealigned eeRecDispatchers[__pagesize];
 
 typedef void DynGenFunc();
 
@@ -531,7 +532,7 @@ static void recReserveCache()
 
 	while (!recMem->IsOk())
 	{
-		if (recMem->Reserve(GetVmMemory().MainMemory(), HostMemoryMap::EErecOffset, m_ConfiguredCacheReserve * _1mb) != NULL)
+		if (recMem->Reserve(GetVmMemory().CodeMemory(), HostMemoryMap::EErecOffset, m_ConfiguredCacheReserve * _1mb) != NULL)
 			break;
 
 		// If it failed, then try again (if possible):
@@ -621,8 +622,8 @@ static void recAlloc()
 	_DynGen_Dispatchers();
 }
 
-alignas(16) static u16 manual_page[Ps2MemSize::MainRam >> 12];
-alignas(16) static u8 manual_counter[Ps2MemSize::MainRam >> 12];
+static __aligned16 u16 manual_page[Ps2MemSize::MainRam >> 12];
+static __aligned16 u8 manual_counter[Ps2MemSize::MainRam >> 12];
 
 static std::atomic<bool> eeRecIsReset(false);
 static std::atomic<bool> eeRecNeedsReset(false);
@@ -727,7 +728,11 @@ static void recExitExecution()
 
 static void recCheckExecutionState()
 {
+#ifndef PCSX2_CORE
 	if (SETJMP_CODE(m_cpuException || m_Exception ||) eeRecIsReset || GetCoreThread().HasPendingStateChangeRequest())
+#else
+	if (SETJMP_CODE(m_cpuException || m_Exception ||) eeRecIsReset || VMManager::Internal::IsExecutionInterrupted())
+#endif
 	{
 		recExitExecution();
 	}
@@ -769,14 +774,18 @@ static void recExecute()
 		// in Linux, which cannot have a C++ exception cross the recompiler.  Hence the changing
 		// of the cancelstate here!
 
+#ifndef __ANDROID__
 		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+#endif
 		EnterRecompiledCode();
 
 		// Generally unreachable code here ...
 	}
 	else
 	{
+#ifndef __ANDROID__
 		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+#endif
 	}
 
 	eeCpuExecuting = false;
@@ -1142,7 +1151,7 @@ static void iBranchTest(u32 newpc)
 
 	if (EmuConfig.Speedhacks.WaitLoop && s_nBlockFF && newpc == s_branchTo)
 	{
-		xMOV(eax, ptr32[&g_nextEventCycle]);
+		xMOV(eax, ptr32[&cpuRegs.nextEventCycle]);
 		xADD(ptr32[&cpuRegs.cycle], scaleblockcycles());
 		xCMP(eax, ptr32[&cpuRegs.cycle]);
 		xCMOVS(eax, ptr32[&cpuRegs.cycle]);
@@ -1155,7 +1164,7 @@ static void iBranchTest(u32 newpc)
 		xMOV(eax, ptr[&cpuRegs.cycle]);
 		xADD(eax, scaleblockcycles());
 		xMOV(ptr[&cpuRegs.cycle], eax); // update cycles
-		xSUB(eax, ptr[&g_nextEventCycle]);
+		xSUB(eax, ptr[&cpuRegs.nextEventCycle]);
 
 		if (newpc == 0xffffffff)
 			xJS(DispatcherReg);
@@ -1307,7 +1316,9 @@ void dynarecCheckBreakpoint()
 		return;
 
 	CBreakPoints::SetBreakpointTriggered(true);
+#ifndef PCSX2_CORE
 	GetCoreThread().PauseSelfDebug();
+#endif
 	recExitExecution();
 }
 
@@ -1318,7 +1329,9 @@ void dynarecMemcheck()
 		return;
 
 	CBreakPoints::SetBreakpointTriggered(true);
+#ifndef PCSX2_CORE
 	GetCoreThread().PauseSelfDebug();
+#endif
 	recExitExecution();
 }
 
@@ -1647,8 +1660,11 @@ void recompileNextInstruction(int delayslot)
 	cpuRegs.code = *s_pCode;
 #endif
 
+#if 0
+	// TODO: Re-enable this later...
 	if (!delayslot && (xGetPtr() - recPtr > 0x1000))
 		s_nEndBlock = pc;
+#endif
 }
 
 // (Called from recompiled code)]
@@ -1670,6 +1686,49 @@ static void __fastcall PreBlockCheck(u32 blockpc)
 
 		lastrec = blockpc;
 	}*/
+
+#if 0
+	static FILE* fp = nullptr;
+	static bool fp_opened = false;
+	if (!fp_opened && cpuRegs.cycle >= 615088823)
+	{
+		fp = std::fopen("reglog.txt", "wb");
+		fp_opened = true;
+	}
+	if (fp)
+	{
+		u32 hash = crc32(0, (Bytef*)&cpuRegs, offsetof(cpuRegisters, pc));
+		u32 hashf = crc32(0, (Bytef*)&fpuRegs, sizeof(fpuRegisters));
+		u32 hashi = crc32(0, (Bytef*)&VU0, offsetof(VURegs, idx));
+
+#if 0
+		std::fprintf(fp, "%08X (%u; %08X; %08X; %08X):", cpuRegs.pc, cpuRegs.cycle, hash, hashf, hashi);
+		for (int i = 0; i < 34; i++)
+		{
+			std::fprintf(fp, " %s: %08X%08X%08X%08X", R3000A::disRNameGPR[i], cpuRegs.GPR.r[i].UL[3], cpuRegs.GPR.r[i].UL[2], cpuRegs.GPR.r[i].UL[1], cpuRegs.GPR.r[i].UL[0]);
+		}
+#if 0
+		std::fprintf(fp, "\nFPR: CR: %08X ACC: %08X", fpuRegs.fprc[31], fpuRegs.ACC.UL);
+		for (int i = 0; i < 32; i++)
+			std::fprintf(fp, " %08X", fpuRegs.fpr[i].UL);
+#endif
+#if 0
+		std::fprintf(fp, "\nVF: ");
+		for (int i = 0; i < 32; i++)
+			std::fprintf(fp, " %u: %08X %08X %08X %08X", i, VU0.VF[i].UL[0], VU0.VF[i].UL[1], VU0.VF[i].UL[2], VU0.VF[i].UL[3]);
+		std::fprintf(fp, "\nACC: %08X %08X %08X %08X Q: %08X P: %08X", VU0.ACC.UL[0], VU0.ACC.UL[1], VU0.ACC.UL[2], VU0.ACC.UL[3], VU0.q.UL, VU0.p.UL);
+#endif
+		std::fprintf(fp, "\n");
+#else
+		std::fprintf(fp, "%08X (%u): %08X %08X %08X\n", cpuRegs.pc, cpuRegs.cycle, hash, hashf, hashi);
+#endif
+		// std::fflush(fp);
+	}
+#endif
+#if 0
+	if (cpuRegs.cycle == 615088823)
+		__debugbreak();
+#endif
 }
 
 #ifdef PCSX2_DEBUG
@@ -1925,7 +1984,7 @@ static void __fastcall recRecompile(const u32 startpc)
 	_initX86regs();
 	_initXMMregs();
 
-	if (EmuConfig.Cpu.Recompiler.PreBlockCheckEE)
+	if ((IsDebugBuild || IsDevBuild) /*&& EmuConfig.Cpu.Recompiler.PreBlockCheckEE*/)
 	{
 		// per-block dump checks, for debugging purposes.
 		// [TODO] : These must be enabled from the GUI or INI to be used, otherwise the
@@ -2232,9 +2291,9 @@ StartRecomp:
 
 #ifdef PCSX2_DEBUG
 	// dump code
-	for (u32 recblock : s_recblocks)
+	for (i = 0; i < ArraySize(s_recblocks); ++i)
 	{
-		if (startpc == recblock)
+		if (startpc == s_recblocks[i])
 		{
 			iDumpBlock(startpc, recPtr);
 		}

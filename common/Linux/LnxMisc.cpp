@@ -53,7 +53,9 @@ u64 GetCPUTicks()
 
 wxString GetOSVersionString()
 {
-#if defined(__linux__)
+#if defined(__ANDROID__)
+	return wxT("Android");
+#elif defined(__linux__)
 	return wxGetLinuxDistributionInfo().Description;
 #else // freebsd
 	return wxGetOsDescription();

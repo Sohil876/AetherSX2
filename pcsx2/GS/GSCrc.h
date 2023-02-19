@@ -15,8 +15,6 @@
 
 #pragma once
 
-#include <map>
-
 class CRC
 {
 public:
@@ -172,16 +170,16 @@ public:
 
 	struct Game
 	{
-		u32 crc;
+		uint32 crc;
 		Title title;
 		Region region;
-		u32 flags;
+		uint32 flags;
 	};
 
 private:
-	static const Game m_games[];
-	static std::map<u32, const Game*> m_map;
+	static Game m_games[];
+	static std::map<uint32, Game*> m_map;
 
 public:
-	static const Game& Lookup(u32 crc);
+	static Game Lookup(uint32 crc);
 };

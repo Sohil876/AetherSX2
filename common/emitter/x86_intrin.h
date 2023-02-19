@@ -15,6 +15,8 @@
 
 #pragma once
 
+#if defined(_M_X86_32) || defined(_M_X86_64)
+
 // Because nobody can't agree on a single name !
 #if defined(__GNUC__)
 
@@ -26,6 +28,8 @@
 #else
 
 #include "Intrin.h"
+
+#endif
 
 #endif
 

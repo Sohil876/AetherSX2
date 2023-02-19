@@ -40,3 +40,4 @@ namespace PerformanceMetrics
 	float GetVUThreadUsage();
 	float GetVUThreadAverageTime();
 } // namespace PerformanceMetrics
+

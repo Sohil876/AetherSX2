@@ -90,7 +90,8 @@ namespace FileSystem
 	/// Replaces the extension of a filename with another.
 	std::string ReplaceExtension(const std::string_view& path, const std::string_view& new_extension);
 
-	/// Returns the display name of a filename. Usually this is the same as the path.
+	/// Returns the display name of a filename. Usually this is the same as the path, except on Android
+	/// where it resolves a content URI to its name.
 	std::string GetDisplayNameFromPath(const std::string_view& path);
 
 	/// Returns the directory component of a filename.

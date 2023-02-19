@@ -98,20 +98,19 @@ void GSDrawScanline::BeginDraw(const GSRasterizerData* data)
 	sel.fb = m_global.sel.fb;
 	sel.zb = m_global.sel.zb;
 	sel.zoverflow = m_global.sel.zoverflow;
-	sel.zequal = m_global.sel.zequal;
 	sel.notest = m_global.sel.notest;
 
 	m_sp = m_sp_map[sel];
 }
 
-void GSDrawScanline::EndDraw(u64 frame, u64 ticks, int actual, int total, int prims)
+void GSDrawScanline::EndDraw(uint64 frame, uint64 ticks, int actual, int total, int prims)
 {
 	m_ds_map.UpdateStats(frame, ticks, actual, total, prims);
 }
 
 #ifndef ENABLE_JIT_RASTERIZER
 
-void GSDrawScanline::SetupPrim(const GSVertexSW* vertex, const u32* index, const GSVertexSW& dscan)
+void GSDrawScanline::SetupPrim(const GSVertexSW* vertex, const uint32* index, const GSVertexSW& dscan)
 {
 	GSScanlineSelector sel = m_global.sel;
 
@@ -144,20 +143,13 @@ void GSDrawScanline::SetupPrim(const GSVertexSW* vertex, const u32* index, const
 
 			if (has_z)
 			{
-				if (sel.zequal)
+				m_local.d8.p.z = dp8.extract32<2>();
+
+				GSVector8 dz = GSVector8::broadcast32(&dscan.p.z);
+
+				for (int i = 0; i < 8; i++)
 				{
-					m_local.p.z = vertex[index[1]].t.U32[3];
-				}
-
-				{
-					m_local.d8.p.z = dp8.extract32<2>();
-
-					const GSVector8 dz = GSVector8::broadcast32(&dscan.p.z);
-
-					for (int i = 0; i < 8; i++)
-					{
-						m_local.d[i].z = dz * shift[1 + i];
-					}
+					m_local.d[i].z = dz * shift[1 + i];
 				}
 			}
 		}
@@ -170,7 +162,7 @@ void GSDrawScanline::SetupPrim(const GSVertexSW* vertex, const u32* index, const
 
 			if (has_z)
 			{
-				m_local.p.z = vertex[index[1]].t.U32[3]; // u32 z is bypassed in t.w
+				m_local.p.z = vertex[index[1]].t.u32[3]; // uint32 z is bypassed in t.w
 			}
 		}
 	}
@@ -275,7 +267,7 @@ void GSDrawScanline::SetupPrim(const GSVertexSW* vertex, const u32* index, const
 			c = c.upl16(c.zwxy());
 
 			if (sel.tfx == TFX_NONE)
-				c = c.srl16(7);
+				c = c.srl16<7>();
 
 			m_local.c.rb = c.xxxx();
 			m_local.c.ga = c.zzzz();
@@ -323,7 +315,7 @@ void GSDrawScanline::SetupPrim(const GSVertexSW* vertex, const u32* index, const
 
 			if (has_z)
 			{
-				m_local.p.z = vertex[index[1]].t.U32[3]; // u32 z is bypassed in t.w
+				m_local.p.z = vertex[index[1]].t.u32[3]; // uint32 z is bypassed in t.w
 			}
 		}
 	}
@@ -422,7 +414,7 @@ void GSDrawScanline::SetupPrim(const GSVertexSW* vertex, const u32* index, const
 			c = c.upl16(c.zwxy());
 
 			if (sel.tfx == TFX_NONE)
-				c = c.srl16(7);
+				c = c.srl16<7>();
 
 			m_local.c.rb = c.xxxx();
 			m_local.c.ga = c.zzzz();
@@ -485,7 +477,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 	{
 		if (sel.edge)
 		{
-			cov = GSVector8i::broadcast16(GSVector4i::cast(scan.t).srl<12>()).srl16(9);
+			cov = GSVector8i::broadcast16(GSVector4i::cast(scan.t).srl<12>()).srl16<9>();
 		}
 
 		if (sel.tfx != TFX_NONE)
@@ -503,7 +495,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				}
 				else if (sel.ltf)
 				{
-					vf = v.xxzzlh().srl16(12);
+					vf = v.xxzzlh().srl16<12>();
 				}
 
 				s = GSVector8::cast(u);
@@ -553,14 +545,9 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 				if (sel.prim != GS_SPRITE_CLASS)
 				{
-					// Need to handle when the float converts incorrectly
 					GSVector8 z = GSVector8::broadcast32(&scan.p.z) + zo;
 
-					if (sel.zequal)
-					{
-						zs = GSVector8i::broadcast32(&m_local.p.z);
-					}
-					else if (sel.zoverflow)
+					if (sel.zoverflow)
 					{
 						zs = (GSVector8i(z * 0.5f) << 1) | (GSVector8i(z) & GSVector8i::x00000001());
 					}
@@ -577,13 +564,13 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				if (sel.ztest)
 				{
 					zd = GSVector8i::load(
-						(u8*)m_global.vm + za * 2, (u8*)m_global.vm + za * 2 + 16,
-						(u8*)m_global.vm + za * 2 + 32, (u8*)m_global.vm + za * 2 + 48);
+						(uint8*)m_global.vm + za * 2, (uint8*)m_global.vm + za * 2 + 16,
+						(uint8*)m_global.vm + za * 2 + 32, (uint8*)m_global.vm + za * 2 + 48);
 
 					switch (sel.zpsm)
 					{
-						case 1: zd = zd.sll32( 8).srl32( 8); break;
-						case 2: zd = zd.sll32(16).srl32(16); break;
+						case 1: zd = zd.sll32< 8>().srl32< 8>(); break;
+						case 2: zd = zd.sll32<16>().srl32<16>(); break;
 						default: break;
 					}
 
@@ -644,7 +631,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 							lod += 0x8000;
 						}
 
-						lodi = lod.srl32(16);
+						lodi = lod.srl32<16>();
 
 						if (sel.mmin == 2) // trilinear mode
 						{
@@ -689,11 +676,11 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 						u -= 0x8000;
 						v -= 0x8000;
 
-						uf = u.xxzzlh().srl16(12);
-						vf = v.xxzzlh().srl16(12);
+						uf = u.xxzzlh().srl16<12>();
+						vf = v.xxzzlh().srl16<12>();
 					}
 
-					GSVector8i uv0 = u.sra32(16).ps32(v.sra32(16));
+					GSVector8i uv0 = u.sra32<16>().ps32(v.sra32<16>());
 					GSVector8i uv1 = uv0;
 
 					{
@@ -730,39 +717,39 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 						{
 							for (int i = 0; i < 8; i++)
 							{
-								const u8* tex = (const u8*)m_global.tex[lodi.U32[i]];
+								const uint8* tex = (const uint8*)m_global.tex[lodi.u32[i]];
 
-								c00.U32[i] = m_global.clut[tex[addr00.U32[i]]];
-								c01.U32[i] = m_global.clut[tex[addr01.U32[i]]];
-								c10.U32[i] = m_global.clut[tex[addr10.U32[i]]];
-								c11.U32[i] = m_global.clut[tex[addr11.U32[i]]];
+								c00.u32[i] = m_global.clut[tex[addr00.u32[i]]];
+								c01.u32[i] = m_global.clut[tex[addr01.u32[i]]];
+								c10.u32[i] = m_global.clut[tex[addr10.u32[i]]];
+								c11.u32[i] = m_global.clut[tex[addr11.u32[i]]];
 							}
 						}
 						else
 						{
 							for (int i = 0; i < 8; i++)
 							{
-								const u32* tex = (const u32*)m_global.tex[lodi.U32[i]];
+								const uint32* tex = (const uint32*)m_global.tex[lodi.u32[i]];
 
-								c00.U32[i] = tex[addr00.U32[i]];
-								c01.U32[i] = tex[addr01.U32[i]];
-								c10.U32[i] = tex[addr10.U32[i]];
-								c11.U32[i] = tex[addr11.U32[i]];
+								c00.u32[i] = tex[addr00.u32[i]];
+								c01.u32[i] = tex[addr01.u32[i]];
+								c10.u32[i] = tex[addr10.u32[i]];
+								c11.u32[i] = tex[addr11.u32[i]];
 							}
 						}
 
-						GSVector8i rb00 = c00.sll16(8).srl16(8);
-						GSVector8i ga00 = c00.srl16(8);
-						GSVector8i rb01 = c01.sll16(8).srl16(8);
-						GSVector8i ga01 = c01.srl16(8);
+						GSVector8i rb00 = c00.sll16<8>().srl16<8>();
+						GSVector8i ga00 = c00.srl16<8>();
+						GSVector8i rb01 = c01.sll16<8>().srl16<8>();
+						GSVector8i ga01 = c01.srl16<8>();
 
 						rb00 = rb00.lerp16_4(rb01, uf);
 						ga00 = ga00.lerp16_4(ga01, uf);
 
-						GSVector8i rb10 = c10.sll16(8).srl16(8);
-						GSVector8i ga10 = c10.srl16(8);
-						GSVector8i rb11 = c11.sll16(8).srl16(8);
-						GSVector8i ga11 = c11.srl16(8);
+						GSVector8i rb10 = c10.sll16<8>().srl16<8>();
+						GSVector8i ga10 = c10.srl16<8>();
+						GSVector8i rb11 = c11.sll16<8>().srl16<8>();
+						GSVector8i ga11 = c11.srl16<8>();
 
 						rb10 = rb10.lerp16_4(rb11, uf);
 						ga10 = ga10.lerp16_4(ga11, uf);
@@ -778,19 +765,19 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 						{
 							for (int i = 0; i < 8; i++)
 							{
-								c00.U32[i] = m_global.clut[((const u8*)m_global.tex[lodi.U32[i]])[addr00.U32[i]]];
+								c00.u32[i] = m_global.clut[((const uint8*)m_global.tex[lodi.u32[i]])[addr00.u32[i]]];
 							}
 						}
 						else
 						{
 							for (int i = 0; i < 8; i++)
 							{
-								c00.U32[i] = ((const u32*)m_global.tex[lodi.U32[i]])[addr00.U32[i]];
+								c00.u32[i] = ((const uint32*)m_global.tex[lodi.u32[i]])[addr00.u32[i]];
 							}
 						}
 
-						rb = c00.sll16(8).srl16(8);
-						ga = c00.srl16(8);
+						rb = c00.sll16<8>().srl16<8>();
+						ga = c00.srl16<8>();
 					}
 
 					if (sel.mmin != 1) // !round-off mode
@@ -799,22 +786,22 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 						lodi += GSVector8i::x00000001();
 
-						u = uv[0].sra32(1);
-						v = uv[1].sra32(1);
+						u = uv[0].sra32<1>();
+						v = uv[1].sra32<1>();
 
-						minuv = minuv.srl16(1);
-						maxuv = maxuv.srl16(1);
+						minuv = minuv.srl16<1>();
+						maxuv = maxuv.srl16<1>();
 
 						if (sel.ltf)
 						{
 							u -= 0x8000;
 							v -= 0x8000;
 
-							uf = u.xxzzlh().srl16(12);
-							vf = v.xxzzlh().srl16(12);
+							uf = u.xxzzlh().srl16<12>();
+							vf = v.xxzzlh().srl16<12>();
 						}
 
-						GSVector8i uv0 = u.sra32(16).ps32(v.sra32(16));
+						GSVector8i uv0 = u.sra32<16>().ps32(v.sra32<16>());
 						GSVector8i uv1 = uv0;
 
 						{
@@ -851,39 +838,39 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 							{
 								for (int i = 0; i < 8; i++)
 								{
-									const u8* tex = (const u8*)m_global.tex[lodi.U32[i]];
+									const uint8* tex = (const uint8*)m_global.tex[lodi.u32[i]];
 
-									c00.U32[i] = m_global.clut[tex[addr00.U32[i]]];
-									c01.U32[i] = m_global.clut[tex[addr01.U32[i]]];
-									c10.U32[i] = m_global.clut[tex[addr10.U32[i]]];
-									c11.U32[i] = m_global.clut[tex[addr11.U32[i]]];
+									c00.u32[i] = m_global.clut[tex[addr00.u32[i]]];
+									c01.u32[i] = m_global.clut[tex[addr01.u32[i]]];
+									c10.u32[i] = m_global.clut[tex[addr10.u32[i]]];
+									c11.u32[i] = m_global.clut[tex[addr11.u32[i]]];
 								}
 							}
 							else
 							{
 								for (int i = 0; i < 8; i++)
 								{
-									const u32* tex = (const u32*)m_global.tex[lodi.U32[i]];
+									const uint32* tex = (const uint32*)m_global.tex[lodi.u32[i]];
 
-									c00.U32[i] = tex[addr00.U32[i]];
-									c01.U32[i] = tex[addr01.U32[i]];
-									c10.U32[i] = tex[addr10.U32[i]];
-									c11.U32[i] = tex[addr11.U32[i]];
+									c00.u32[i] = tex[addr00.u32[i]];
+									c01.u32[i] = tex[addr01.u32[i]];
+									c10.u32[i] = tex[addr10.u32[i]];
+									c11.u32[i] = tex[addr11.u32[i]];
 								}
 							}
 
-							GSVector8i rb00 = c00.sll16(8).srl16(8);
-							GSVector8i ga00 = c00.srl16(8);
-							GSVector8i rb01 = c01.sll16(8).srl16(8);
-							GSVector8i ga01 = c01.srl16(8);
+							GSVector8i rb00 = c00.sll16<8>().srl16<8>();
+							GSVector8i ga00 = c00.srl16<8>();
+							GSVector8i rb01 = c01.sll16<8>().srl16<8>();
+							GSVector8i ga01 = c01.srl16<8>();
 
 							rb00 = rb00.lerp16_4(rb01, uf);
 							ga00 = ga00.lerp16_4(ga01, uf);
 
-							GSVector8i rb10 = c10.sll16(8).srl16(8);
-							GSVector8i ga10 = c10.srl16(8);
-							GSVector8i rb11 = c11.sll16(8).srl16(8);
-							GSVector8i ga11 = c11.srl16(8);
+							GSVector8i rb10 = c10.sll16<8>().srl16<8>();
+							GSVector8i ga10 = c10.srl16<8>();
+							GSVector8i rb11 = c11.sll16<8>().srl16<8>();
+							GSVector8i ga11 = c11.srl16<8>();
 
 							rb10 = rb10.lerp16_4(rb11, uf);
 							ga10 = ga10.lerp16_4(ga11, uf);
@@ -899,25 +886,25 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 							{
 								for (int i = 0; i < 8; i++)
 								{
-									c00.U32[i] = m_global.clut[((const u8*)m_global.tex[lodi.U32[i]])[addr00.U32[i]]];
+									c00.u32[i] = m_global.clut[((const uint8*)m_global.tex[lodi.u32[i]])[addr00.u32[i]]];
 								}
 							}
 							else
 							{
 								for (int i = 0; i < 8; i++)
 								{
-									c00.U32[i] = ((const u32*)m_global.tex[lodi.U32[i]])[addr00.U32[i]];
+									c00.u32[i] = ((const uint32*)m_global.tex[lodi.u32[i]])[addr00.u32[i]];
 								}
 							}
 
-							rb2 = c00.sll16(8).srl16(8);
-							ga2 = c00.srl16(8);
+							rb2 = c00.sll16<8>().srl16<8>();
+							ga2 = c00.srl16<8>();
 						}
 
 						if (sel.lcm)
 							lodf = m_global.lod.f;
 
-						lodf = lodf.srl16(1);
+						lodf = lodf.srl16<1>();
 
 						rb = rb.lerp16<0>(rb2, lodf);
 						ga = ga.lerp16<0>(ga2, lodf);
@@ -944,15 +931,15 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 					if (sel.ltf)
 					{
-						uf = u.xxzzlh().srl16(12);
+						uf = u.xxzzlh().srl16<12>();
 
 						if (sel.prim != GS_SPRITE_CLASS)
 						{
-							vf = v.xxzzlh().srl16(12);
+							vf = v.xxzzlh().srl16<12>();
 						}
 					}
 
-					GSVector8i uv0 = u.sra32(16).ps32(v.sra32(16));
+					GSVector8i uv0 = u.sra32<16>().ps32(v.sra32<16>());
 					GSVector8i uv1 = uv0;
 
 					GSVector8i tmin = GSVector8i::broadcast128(m_global.t.min);
@@ -990,7 +977,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 						if (sel.tlu)
 						{
-							const u8* tex = (const u8*)m_global.tex[0];
+							const uint8* tex = (const uint8*)m_global.tex[0];
 
 							c00 = addr00.gather32_32(tex, m_global.clut);
 							c01 = addr01.gather32_32(tex, m_global.clut);
@@ -999,7 +986,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 						}
 						else
 						{
-							const u32* tex = (const u32*)m_global.tex[0];
+							const uint32* tex = (const uint32*)m_global.tex[0];
 
 							c00 = addr00.gather32_32(tex);
 							c01 = addr01.gather32_32(tex);
@@ -1007,18 +994,18 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 							c11 = addr11.gather32_32(tex);
 						}
 
-						GSVector8i rb00 = c00.sll16(8).srl16(8);
-						GSVector8i ga00 = c00.srl16(8);
-						GSVector8i rb01 = c01.sll16(8).srl16(8);
-						GSVector8i ga01 = c01.srl16(8);
+						GSVector8i rb00 = c00.sll16<8>().srl16<8>();
+						GSVector8i ga00 = c00.srl16<8>();
+						GSVector8i rb01 = c01.sll16<8>().srl16<8>();
+						GSVector8i ga01 = c01.srl16<8>();
 
 						rb00 = rb00.lerp16_4(rb01, uf);
 						ga00 = ga00.lerp16_4(ga01, uf);
 
-						GSVector8i rb10 = c10.sll16(8).srl16(8);
-						GSVector8i ga10 = c10.srl16(8);
-						GSVector8i rb11 = c11.sll16(8).srl16(8);
-						GSVector8i ga11 = c11.srl16(8);
+						GSVector8i rb10 = c10.sll16<8>().srl16<8>();
+						GSVector8i ga10 = c10.srl16<8>();
+						GSVector8i rb11 = c11.sll16<8>().srl16<8>();
+						GSVector8i ga11 = c11.srl16<8>();
 
 						rb10 = rb10.lerp16_4(rb11, uf);
 						ga10 = ga10.lerp16_4(ga11, uf);
@@ -1032,15 +1019,15 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 						if (sel.tlu)
 						{
-							c00 = addr00.gather32_32((const u8*)m_global.tex[0], m_global.clut);
+							c00 = addr00.gather32_32((const uint8*)m_global.tex[0], m_global.clut);
 						}
 						else
 						{
-							c00 = addr00.gather32_32((const u32*)m_global.tex[0]);
+							c00 = addr00.gather32_32((const uint32*)m_global.tex[0]);
 						}
 
-						rb = c00.sll16(8).srl16(8);
-						ga = c00.srl16(8);
+						rb = c00.sll16<8>().srl16<8>();
+						ga = c00.srl16<8>();
 					}
 				}
 			}
@@ -1054,21 +1041,21 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 					case TFX_MODULATE:
 						ga = ga.modulate16<1>(gaf).clamp8();
 						if (!sel.tcc)
-							ga = ga.mix16(gaf.srl16(7));
+							ga = ga.mix16(gaf.srl16<7>());
 						break;
 					case TFX_DECAL:
 						if (!sel.tcc)
-							ga = ga.mix16(gaf.srl16(7));
+							ga = ga.mix16(gaf.srl16<7>());
 						break;
 					case TFX_HIGHLIGHT:
-						ga = ga.mix16(!sel.tcc ? gaf.srl16(7) : ga.addus8(gaf.srl16(7)));
+						ga = ga.mix16(!sel.tcc ? gaf.srl16<7>() : ga.addus8(gaf.srl16<7>()));
 						break;
 					case TFX_HIGHLIGHT2:
 						if (!sel.tcc)
-							ga = ga.mix16(gaf.srl16(7));
+							ga = ga.mix16(gaf.srl16<7>());
 						break;
 					case TFX_NONE:
-						ga = sel.iip ? gaf.srl16(7) : gaf;
+						ga = sel.iip ? gaf.srl16<7>() : gaf;
 						break;
 				}
 
@@ -1084,7 +1071,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 					}
 					else
 					{
-						ga = ga.blend8(a, ga.eq16(x00800080).srl32(16).sll32(16));
+						ga = ga.blend8(a, ga.eq16(x00800080).srl32<16>().sll32<16>());
 					}
 				}
 			}
@@ -1121,12 +1108,12 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 						break;
 					case TFX_HIGHLIGHT:
 					case TFX_HIGHLIGHT2:
-						af = gaf.yywwlh().srl16(7);
+						af = gaf.yywwlh().srl16<7>();
 						rb = rb.modulate16<1>(rbf).add16(af).clamp8();
 						ga = ga.modulate16<1>(gaf).add16(af).clamp8().mix16(ga);
 						break;
 					case TFX_NONE:
-						rb = sel.iip ? rbf.srl16(7) : rbf;
+						rb = sel.iip ? rbf.srl16<7>() : rbf;
 						break;
 				}
 			}
@@ -1144,12 +1131,12 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				ga = fga.lerp16<0>(ga, fog).mix16(ga);
 
 				/*
-				fog = fog.srl16(7);
+				fog = fog.srl16<7>();
 
 				GSVector8i ifog = GSVector4i::x00ff().sub16(fog);
 
-				rb = rb.mul16l(fog).add16(frb.mul16l(ifog)).srl16(8);
-				ga = ga.mul16l(fog).add16(fga.mul16l(ifog)).srl16(8).mix16(ga);
+				rb = rb.mul16l(fog).add16(frb.mul16l(ifog)).srl16<8>();
+				ga = ga.mul16l(fog).add16(fga.mul16l(ifog)).srl16<8>().mix16(ga);
 				*/
 			}
 
@@ -1162,8 +1149,8 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				if (sel.rfb)
 				{
 					fd = GSVector8i::load(
-						(u8*)m_global.vm + fa * 2, (u8*)m_global.vm + fa * 2 + 16,
-						(u8*)m_global.vm + fa * 2 + 32, (u8*)m_global.vm + fa * 2 + 48);
+						(uint8*)m_global.vm + fa * 2, (uint8*)m_global.vm + fa * 2 + 16,
+						(uint8*)m_global.vm + fa * 2 + 32, (uint8*)m_global.vm + fa * 2 + 48);
 				}
 			}
 
@@ -1175,23 +1162,23 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				{
 					if (sel.fpsm == 2)
 					{
-						// test |= fd.srl32(15) == GSVector8i::zero();
-						test |= fd.sll32(16).sra32(31) == GSVector8i::zero();
+						// test |= fd.srl32<15>() == GSVector8i::zero();
+						test |= fd.sll32<16>().sra32<31>() == GSVector8i::zero();
 					}
 					else
 					{
-						test |= (~fd).sra32(31);
+						test |= (~fd).sra32<31>();
 					}
 				}
 				else
 				{
 					if (sel.fpsm == 2)
 					{
-						test |= fd.sll32(16).sra32(31); // == GSVector8i::xffffffff();
+						test |= fd.sll32<16>().sra32<31>(); // == GSVector8i::xffffffff();
 					}
 					else
 					{
-						test |= fd.sra32(31);
+						test |= fd.sra32<31>();
 					}
 				}
 
@@ -1247,10 +1234,10 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				{
 					if (fast)
 					{
-						GSVector4i::storel((u8*)m_global.vm + za * 2, zs.extract<0>());
-						GSVector4i::storeh((u8*)m_global.vm + za * 2 + 16, zs.extract<0>());
-						GSVector4i::storel((u8*)m_global.vm + za * 2 + 32, zs.extract<1>());
-						GSVector4i::storeh((u8*)m_global.vm + za * 2 + 48, zs.extract<1>());
+						GSVector4i::storel((uint8*)m_global.vm + za * 2, zs.extract<0>());
+						GSVector4i::storeh((uint8*)m_global.vm + za * 2 + 16, zs.extract<0>());
+						GSVector4i::storel((uint8*)m_global.vm + za * 2 + 32, zs.extract<1>());
+						GSVector4i::storeh((uint8*)m_global.vm + za * 2 + 48, zs.extract<1>());
 					}
 					else
 					{
@@ -1268,10 +1255,10 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				{
 					if (fast)
 					{
-						if (fzm & 0x00000f00) GSVector4i::storel((u8*)m_global.vm + za * 2, zs.extract<0>());
-						if (fzm & 0x0000f000) GSVector4i::storeh((u8*)m_global.vm + za * 2 + 16, zs.extract<0>());
-						if (fzm & 0x0f000000) GSVector4i::storel((u8*)m_global.vm + za * 2 + 32, zs.extract<1>());
-						if (fzm & 0xf0000000) GSVector4i::storeh((u8*)m_global.vm + za * 2 + 48, zs.extract<1>());
+						if (fzm & 0x00000f00) GSVector4i::storel((uint8*)m_global.vm + za * 2, zs.extract<0>());
+						if (fzm & 0x0000f000) GSVector4i::storeh((uint8*)m_global.vm + za * 2 + 16, zs.extract<0>());
+						if (fzm & 0x0f000000) GSVector4i::storel((uint8*)m_global.vm + za * 2 + 32, zs.extract<1>());
+						if (fzm & 0xf0000000) GSVector4i::storeh((uint8*)m_global.vm + za * 2 + 48, zs.extract<1>());
 					}
 					else
 					{
@@ -1299,8 +1286,8 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 					{
 						case 0:
 						case 1:
-							rbd = fd.sll16(8).srl16(8);
-							gad = fd.srl16(8);
+							rbd = fd.sll16<8>().srl16<8>();
+							gad = fd.srl16<8>();
 							break;
 						case 2:
 							rbd = ((fd & 0x7c00) << 9) | ((fd & 0x001f) << 3);
@@ -1329,8 +1316,8 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 					{
 						switch(sel.abc)
 						{
-							case 0: a = gas.yywwlh().sll16(7); break;
-							case 1: a = gad.yywwlh().sll16(7); break;
+							case 0: a = gas.yywwlh().sll16<7>(); break;
+							case 1: a = gad.yywwlh().sll16<7>(); break;
 							case 2: a = m_global.afix; break;
 						}
 
@@ -1356,7 +1343,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 				if (sel.pabe)
 				{
-					mask = (gas << 8).sra32(31);
+					mask = (gas << 8).sra32<31>();
 
 					rb = rbs.blend8(rb, mask);
 				}
@@ -1456,10 +1443,10 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				{
 					if (fast)
 					{
-						GSVector4i::storel((u8*)m_global.vm + fa * 2, fs.extract<0>());
-						GSVector4i::storeh((u8*)m_global.vm + fa * 2 + 16, fs.extract<0>());
-						GSVector4i::storel((u8*)m_global.vm + fa * 2 + 32, fs.extract<1>());
-						GSVector4i::storeh((u8*)m_global.vm + fa * 2 + 48, fs.extract<1>());
+						GSVector4i::storel((uint8*)m_global.vm + fa * 2, fs.extract<0>());
+						GSVector4i::storeh((uint8*)m_global.vm + fa * 2 + 16, fs.extract<0>());
+						GSVector4i::storel((uint8*)m_global.vm + fa * 2 + 32, fs.extract<1>());
+						GSVector4i::storeh((uint8*)m_global.vm + fa * 2 + 48, fs.extract<1>());
 					}
 					else
 					{
@@ -1477,10 +1464,10 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				{
 					if (fast)
 					{
-						if (fzm & 0x0000000f) GSVector4i::storel((u8*)m_global.vm + fa * 2, fs.extract<0>());
-						if (fzm & 0x000000f0) GSVector4i::storeh((u8*)m_global.vm + fa * 2 + 16, fs.extract<0>());
-						if (fzm & 0x000f0000) GSVector4i::storel((u8*)m_global.vm + fa * 2 + 32, fs.extract<1>());
-						if (fzm & 0x00f00000) GSVector4i::storeh((u8*)m_global.vm + fa * 2 + 48, fs.extract<1>());
+						if (fzm & 0x0000000f) GSVector4i::storel((uint8*)m_global.vm + fa * 2, fs.extract<0>());
+						if (fzm & 0x000000f0) GSVector4i::storeh((uint8*)m_global.vm + fa * 2 + 16, fs.extract<0>());
+						if (fzm & 0x000f0000) GSVector4i::storel((uint8*)m_global.vm + fa * 2 + 32, fs.extract<1>());
+						if (fzm & 0x00f00000) GSVector4i::storeh((uint8*)m_global.vm + fa * 2 + 48, fs.extract<1>());
 					}
 					else
 					{
@@ -1615,7 +1602,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 	{
 		if (sel.edge)
 		{
-			cov = GSVector4i::cast(scan.t).zzzzh().wwww().srl16(9);
+			cov = GSVector4i::cast(scan.t).zzzzh().wwww().srl16<9>();
 		}
 
 		if (sel.tfx != TFX_NONE)
@@ -1633,7 +1620,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				}
 				else if (sel.ltf)
 				{
-					vf = v.xxzzlh().srl16(12);
+					vf = v.xxzzlh().srl16<12>();
 				}
 
 				s = GSVector4::cast(u);
@@ -1701,12 +1688,12 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 				if (sel.ztest)
 				{
-					zd = GSVector4i::load((u8*)m_global.vm + za * 2, (u8*)m_global.vm + za * 2 + 16);
+					zd = GSVector4i::load((uint8*)m_global.vm + za * 2, (uint8*)m_global.vm + za * 2 + 16);
 
 					switch (sel.zpsm)
 					{
-						case 1: zd = zd.sll32( 8).srl32( 8); break;
-						case 2: zd = zd.sll32(16).srl32(16); break;
+						case 1: zd = zd.sll32< 8>().srl32< 8>(); break;
+						case 2: zd = zd.sll32<16>().srl32<16>(); break;
 						default: break;
 					}
 
@@ -1723,10 +1710,10 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 					{
 						const unsigned int z_max = 0xffffffff >> (sel.zpsm * 8);
 
-						zso.U32[0] = std::min(z_max, zso.U32[0]);
-						zso.U32[1] = std::min(z_max, zso.U32[1]);
-						zso.U32[2] = std::min(z_max, zso.U32[2]);
-						zso.U32[3] = std::min(z_max, zso.U32[3]);
+						zso.u32[0] = std::min(z_max, zso.u32[0]);
+						zso.u32[1] = std::min(z_max, zso.u32[1]);
+						zso.u32[2] = std::min(z_max, zso.u32[2]);
+						zso.u32[3] = std::min(z_max, zso.u32[3]);
 					}
 
 					switch (sel.ztst)
@@ -1774,7 +1761,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 							lod += 0x8000;
 						}
 
-						lodi = lod.srl32(16);
+						lodi = lod.srl32<16>();
 
 						if (sel.mmin == 2) // trilinear mode
 						{
@@ -1832,11 +1819,11 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 						u -= 0x8000;
 						v -= 0x8000;
 
-						uf = u.xxzzlh().srl16(12);
-						vf = v.xxzzlh().srl16(12);
+						uf = u.xxzzlh().srl16<12>();
+						vf = v.xxzzlh().srl16<12>();
 					}
 
-					GSVector4i uv0 = u.sra32(16).ps32(v.sra32(16));
+					GSVector4i uv0 = u.sra32<16>().ps32(v.sra32<16>());
 					GSVector4i uv1 = uv0;
 
 					{
@@ -1873,39 +1860,39 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 						{
 							for (int i = 0; i < 4; i++)
 							{
-								const u8* tex = (const u8*)m_global.tex[lodi.U32[i]];
+								const uint8* tex = (const uint8*)m_global.tex[lodi.u32[i]];
 
-								c00.U32[i] = m_global.clut[tex[addr00.U32[i]]];
-								c01.U32[i] = m_global.clut[tex[addr01.U32[i]]];
-								c10.U32[i] = m_global.clut[tex[addr10.U32[i]]];
-								c11.U32[i] = m_global.clut[tex[addr11.U32[i]]];
+								c00.u32[i] = m_global.clut[tex[addr00.u32[i]]];
+								c01.u32[i] = m_global.clut[tex[addr01.u32[i]]];
+								c10.u32[i] = m_global.clut[tex[addr10.u32[i]]];
+								c11.u32[i] = m_global.clut[tex[addr11.u32[i]]];
 							}
 						}
 						else
 						{
 							for (int i = 0; i < 4; i++)
 							{
-								const u32* tex = (const u32*)m_global.tex[lodi.U32[i]];
+								const uint32* tex = (const uint32*)m_global.tex[lodi.u32[i]];
 
-								c00.U32[i] = tex[addr00.U32[i]];
-								c01.U32[i] = tex[addr01.U32[i]];
-								c10.U32[i] = tex[addr10.U32[i]];
-								c11.U32[i] = tex[addr11.U32[i]];
+								c00.u32[i] = tex[addr00.u32[i]];
+								c01.u32[i] = tex[addr01.u32[i]];
+								c10.u32[i] = tex[addr10.u32[i]];
+								c11.u32[i] = tex[addr11.u32[i]];
 							}
 						}
 
-						GSVector4i rb00 = c00.sll16(8).srl16(8);
-						GSVector4i ga00 = c00.srl16(8);
-						GSVector4i rb01 = c01.sll16(8).srl16(8);
-						GSVector4i ga01 = c01.srl16(8);
+						GSVector4i rb00 = c00.sll16<8>().srl16<8>();
+						GSVector4i ga00 = c00.srl16<8>();
+						GSVector4i rb01 = c01.sll16<8>().srl16<8>();
+						GSVector4i ga01 = c01.srl16<8>();
 
 						rb00 = rb00.lerp16_4(rb01, uf);
 						ga00 = ga00.lerp16_4(ga01, uf);
 
-						GSVector4i rb10 = c10.sll16(8).srl16(8);
-						GSVector4i ga10 = c10.srl16(8);
-						GSVector4i rb11 = c11.sll16(8).srl16(8);
-						GSVector4i ga11 = c11.srl16(8);
+						GSVector4i rb10 = c10.sll16<8>().srl16<8>();
+						GSVector4i ga10 = c10.srl16<8>();
+						GSVector4i rb11 = c11.sll16<8>().srl16<8>();
+						GSVector4i ga11 = c11.srl16<8>();
 
 						rb10 = rb10.lerp16_4(rb11, uf);
 						ga10 = ga10.lerp16_4(ga11, uf);
@@ -1921,19 +1908,19 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 						{
 							for (int i = 0; i < 4; i++)
 							{
-								c00.U32[i] = m_global.clut[((const u8*)m_global.tex[lodi.U32[i]])[addr00.U32[i]]];
+								c00.u32[i] = m_global.clut[((const uint8*)m_global.tex[lodi.u32[i]])[addr00.u32[i]]];
 							}
 						}
 						else
 						{
 							for (int i = 0; i < 4; i++)
 							{
-								c00.U32[i] = ((const u32*)m_global.tex[lodi.U32[i]])[addr00.U32[i]];
+								c00.u32[i] = ((const uint32*)m_global.tex[lodi.u32[i]])[addr00.u32[i]];
 							}
 						}
 
-						rb = c00.sll16(8).srl16(8);
-						ga = c00.srl16(8);
+						rb = c00.sll16<8>().srl16<8>();
+						ga = c00.srl16<8>();
 					}
 
 					if (sel.mmin != 1) // !round-off mode
@@ -1942,22 +1929,22 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 						lodi += GSVector4i::x00000001();
 
-						u = uv[0].sra32(1);
-						v = uv[1].sra32(1);
+						u = uv[0].sra32<1>();
+						v = uv[1].sra32<1>();
 
-						minuv = minuv.srl16(1);
-						maxuv = maxuv.srl16(1);
+						minuv = minuv.srl16<1>();
+						maxuv = maxuv.srl16<1>();
 
 						if (sel.ltf)
 						{
 							u -= 0x8000;
 							v -= 0x8000;
 
-							uf = u.xxzzlh().srl16(12);
-							vf = v.xxzzlh().srl16(12);
+							uf = u.xxzzlh().srl16<12>();
+							vf = v.xxzzlh().srl16<12>();
 						}
 
-						GSVector4i uv0 = u.sra32(16).ps32(v.sra32(16));
+						GSVector4i uv0 = u.sra32<16>().ps32(v.sra32<16>());
 						GSVector4i uv1 = uv0;
 
 						{
@@ -1994,39 +1981,39 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 							{
 								for (int i = 0; i < 4; i++)
 								{
-									const u8* tex = (const u8*)m_global.tex[lodi.U32[i]];
+									const uint8* tex = (const uint8*)m_global.tex[lodi.u32[i]];
 
-									c00.U32[i] = m_global.clut[tex[addr00.U32[i]]];
-									c01.U32[i] = m_global.clut[tex[addr01.U32[i]]];
-									c10.U32[i] = m_global.clut[tex[addr10.U32[i]]];
-									c11.U32[i] = m_global.clut[tex[addr11.U32[i]]];
+									c00.u32[i] = m_global.clut[tex[addr00.u32[i]]];
+									c01.u32[i] = m_global.clut[tex[addr01.u32[i]]];
+									c10.u32[i] = m_global.clut[tex[addr10.u32[i]]];
+									c11.u32[i] = m_global.clut[tex[addr11.u32[i]]];
 								}
 							}
 							else
 							{
 								for (int i = 0; i < 4; i++)
 								{
-									const u32* tex = (const u32*)m_global.tex[lodi.U32[i]];
+									const uint32* tex = (const uint32*)m_global.tex[lodi.u32[i]];
 
-									c00.U32[i] = tex[addr00.U32[i]];
-									c01.U32[i] = tex[addr01.U32[i]];
-									c10.U32[i] = tex[addr10.U32[i]];
-									c11.U32[i] = tex[addr11.U32[i]];
+									c00.u32[i] = tex[addr00.u32[i]];
+									c01.u32[i] = tex[addr01.u32[i]];
+									c10.u32[i] = tex[addr10.u32[i]];
+									c11.u32[i] = tex[addr11.u32[i]];
 								}
 							}
 
-							GSVector4i rb00 = c00.sll16(8).srl16(8);
-							GSVector4i ga00 = c00.srl16(8);
-							GSVector4i rb01 = c01.sll16(8).srl16(8);
-							GSVector4i ga01 = c01.srl16(8);
+							GSVector4i rb00 = c00.sll16<8>().srl16<8>();
+							GSVector4i ga00 = c00.srl16<8>();
+							GSVector4i rb01 = c01.sll16<8>().srl16<8>();
+							GSVector4i ga01 = c01.srl16<8>();
 
 							rb00 = rb00.lerp16_4(rb01, uf);
 							ga00 = ga00.lerp16_4(ga01, uf);
 
-							GSVector4i rb10 = c10.sll16(8).srl16(8);
-							GSVector4i ga10 = c10.srl16(8);
-							GSVector4i rb11 = c11.sll16(8).srl16(8);
-							GSVector4i ga11 = c11.srl16(8);
+							GSVector4i rb10 = c10.sll16<8>().srl16<8>();
+							GSVector4i ga10 = c10.srl16<8>();
+							GSVector4i rb11 = c11.sll16<8>().srl16<8>();
+							GSVector4i ga11 = c11.srl16<8>();
 
 							rb10 = rb10.lerp16_4(rb11, uf);
 							ga10 = ga10.lerp16_4(ga11, uf);
@@ -2042,25 +2029,25 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 							{
 								for (int i = 0; i < 4; i++)
 								{
-									c00.U32[i] = m_global.clut[((const u8*)m_global.tex[lodi.U32[i]])[addr00.U32[i]]];
+									c00.u32[i] = m_global.clut[((const uint8*)m_global.tex[lodi.u32[i]])[addr00.u32[i]]];
 								}
 							}
 							else
 							{
 								for (int i = 0; i < 4; i++)
 								{
-									c00.U32[i] = ((const u32*)m_global.tex[lodi.U32[i]])[addr00.U32[i]];
+									c00.u32[i] = ((const uint32*)m_global.tex[lodi.u32[i]])[addr00.u32[i]];
 								}
 							}
 
-							rb2 = c00.sll16(8).srl16(8);
-							ga2 = c00.srl16(8);
+							rb2 = c00.sll16<8>().srl16<8>();
+							ga2 = c00.srl16<8>();
 						}
 
 						if (sel.lcm)
 							lodf = m_global.lod.f;
 
-						lodf = lodf.srl16(1);
+						lodf = lodf.srl16<1>();
 
 						rb = rb.lerp16<0>(rb2, lodf);
 						ga = ga.lerp16<0>(ga2, lodf);
@@ -2087,15 +2074,15 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 					if (sel.ltf)
 					{
-						uf = u.xxzzlh().srl16(12);
+						uf = u.xxzzlh().srl16<12>();
 
 						if (sel.prim != GS_SPRITE_CLASS)
 						{
-							vf = v.xxzzlh().srl16(12);
+							vf = v.xxzzlh().srl16<12>();
 						}
 					}
 
-					GSVector4i uv0 = u.sra32(16).ps32(v.sra32(16));
+					GSVector4i uv0 = u.sra32<16>().ps32(v.sra32<16>());
 					GSVector4i uv1 = uv0;
 
 					{
@@ -2130,7 +2117,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 						if (sel.tlu)
 						{
-							const u8* tex = (const u8*)m_global.tex[0];
+							const uint8* tex = (const uint8*)m_global.tex[0];
 
 							c00 = addr00.gather32_32(tex, m_global.clut);
 							c01 = addr01.gather32_32(tex, m_global.clut);
@@ -2139,7 +2126,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 						}
 						else
 						{
-							const u32* tex = (const u32*)m_global.tex[0];
+							const uint32* tex = (const uint32*)m_global.tex[0];
 
 							c00 = addr00.gather32_32(tex);
 							c01 = addr01.gather32_32(tex);
@@ -2147,18 +2134,18 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 							c11 = addr11.gather32_32(tex);
 						}
 
-						GSVector4i rb00 = c00.sll16(8).srl16(8);
-						GSVector4i ga00 = c00.srl16(8);
-						GSVector4i rb01 = c01.sll16(8).srl16(8);
-						GSVector4i ga01 = c01.srl16(8);
+						GSVector4i rb00 = c00.sll16<8>().srl16<8>();
+						GSVector4i ga00 = c00.srl16<8>();
+						GSVector4i rb01 = c01.sll16<8>().srl16<8>();
+						GSVector4i ga01 = c01.srl16<8>();
 
 						rb00 = rb00.lerp16_4(rb01, uf);
 						ga00 = ga00.lerp16_4(ga01, uf);
 
-						GSVector4i rb10 = c10.sll16(8).srl16(8);
-						GSVector4i ga10 = c10.srl16(8);
-						GSVector4i rb11 = c11.sll16(8).srl16(8);
-						GSVector4i ga11 = c11.srl16(8);
+						GSVector4i rb10 = c10.sll16<8>().srl16<8>();
+						GSVector4i ga10 = c10.srl16<8>();
+						GSVector4i rb11 = c11.sll16<8>().srl16<8>();
+						GSVector4i ga11 = c11.srl16<8>();
 
 						rb10 = rb10.lerp16_4(rb11, uf);
 						ga10 = ga10.lerp16_4(ga11, uf);
@@ -2172,15 +2159,15 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 						if (sel.tlu)
 						{
-							c00 = addr00.gather32_32((const u8*)m_global.tex[0], m_global.clut);
+							c00 = addr00.gather32_32((const uint8*)m_global.tex[0], m_global.clut);
 						}
 						else
 						{
-							c00 = addr00.gather32_32((const u32*)m_global.tex[0]);
+							c00 = addr00.gather32_32((const uint32*)m_global.tex[0]);
 						}
 
-						rb = c00.sll16(8).srl16(8);
-						ga = c00.srl16(8);
+						rb = c00.sll16<8>().srl16<8>();
+						ga = c00.srl16<8>();
 					}
 				}
 			}
@@ -2194,21 +2181,21 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 					case TFX_MODULATE:
 						ga = ga.modulate16<1>(gaf).clamp8();
 						if (!sel.tcc)
-							ga = ga.mix16(gaf.srl16(7));
+							ga = ga.mix16(gaf.srl16<7>());
 						break;
 					case TFX_DECAL:
 						if (!sel.tcc)
-							ga = ga.mix16(gaf.srl16(7));
+							ga = ga.mix16(gaf.srl16<7>());
 						break;
 					case TFX_HIGHLIGHT:
-						ga = ga.mix16(!sel.tcc ? gaf.srl16(7) : ga.addus8(gaf.srl16(7)));
+						ga = ga.mix16(!sel.tcc ? gaf.srl16<7>() : ga.addus8(gaf.srl16<7>()));
 						break;
 					case TFX_HIGHLIGHT2:
 						if (!sel.tcc)
-							ga = ga.mix16(gaf.srl16(7));
+							ga = ga.mix16(gaf.srl16<7>());
 						break;
 					case TFX_NONE:
-						ga = sel.iip ? gaf.srl16(7) : gaf;
+						ga = sel.iip ? gaf.srl16<7>() : gaf;
 						break;
 				}
 
@@ -2224,7 +2211,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 					}
 					else
 					{
-						ga = ga.blend8(a, ga.eq16(x00800080).srl32(16).sll32(16));
+						ga = ga.blend8(a, ga.eq16(x00800080).srl32<16>().sll32<16>());
 					}
 				}
 			}
@@ -2261,12 +2248,12 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 						break;
 					case TFX_HIGHLIGHT:
 					case TFX_HIGHLIGHT2:
-						af = gaf.yywwlh().srl16(7);
+						af = gaf.yywwlh().srl16<7>();
 						rb = rb.modulate16<1>(rbf).add16(af).clamp8();
 						ga = ga.modulate16<1>(gaf).add16(af).clamp8().mix16(ga);
 						break;
 					case TFX_NONE:
-						rb = sel.iip ? rbf.srl16(7) : rbf;
+						rb = sel.iip ? rbf.srl16<7>() : rbf;
 						break;
 				}
 			}
@@ -2281,12 +2268,12 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				ga = m_global.fga.lerp16<0>(ga, fog).mix16(ga);
 
 				/*
-				fog = fog.srl16(7);
+				fog = fog.srl16<7>();
 
 				GSVector4i ifog = GSVector4i::x00ff().sub16(fog);
 
-				rb = rb.mul16l(fog).add16(m_global.frb.mul16l(ifog)).srl16(8);
-				ga = ga.mul16l(fog).add16(m_global.fga.mul16l(ifog)).srl16(8).mix16(ga);
+				rb = rb.mul16l(fog).add16(m_global.frb.mul16l(ifog)).srl16<8>();
+				ga = ga.mul16l(fog).add16(m_global.fga.mul16l(ifog)).srl16<8>().mix16(ga);
 				*/
 			}
 
@@ -2298,7 +2285,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 				if (sel.rfb)
 				{
-					fd = GSVector4i::load((u8*)m_global.vm + fa * 2, (u8*)m_global.vm + fa * 2 + 16);
+					fd = GSVector4i::load((uint8*)m_global.vm + fa * 2, (uint8*)m_global.vm + fa * 2 + 16);
 				}
 			}
 
@@ -2310,23 +2297,23 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				{
 					if (sel.fpsm == 2)
 					{
-						// test |= fd.srl32(15) == GSVector4i::zero();
-						test |= fd.sll32(16).sra32(31) == GSVector4i::zero();
+						// test |= fd.srl32<15>() == GSVector4i::zero();
+						test |= fd.sll32<16>().sra32<31>() == GSVector4i::zero();
 					}
 					else
 					{
-						test |= (~fd).sra32(31);
+						test |= (~fd).sra32<31>();
 					}
 				}
 				else
 				{
 					if (sel.fpsm == 2)
 					{
-						test |= fd.sll32(16).sra32(31); // == GSVector4i::xffffffff();
+						test |= fd.sll32<16>().sra32<31>(); // == GSVector4i::xffffffff();
 					}
 					else
 					{
-						test |= fd.sra32(31);
+						test |= fd.sra32<31>();
 					}
 				}
 
@@ -2377,10 +2364,10 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				{
 					const unsigned int z_max = 0xffffffff >> (sel.zpsm * 8);
 
-					zs.U32[0] = std::min(z_max, zs.U32[0]);
-					zs.U32[1] = std::min(z_max, zs.U32[1]);
-					zs.U32[2] = std::min(z_max, zs.U32[2]);
-					zs.U32[3] = std::min(z_max, zs.U32[3]);
+					zs.u32[0] = std::min(z_max, zs.u32[0]);
+					zs.u32[1] = std::min(z_max, zs.u32[1]);
+					zs.u32[2] = std::min(z_max, zs.u32[2]);
+					zs.u32[3] = std::min(z_max, zs.u32[3]);
 				}
 
 				bool fast = sel.ztest ? sel.zpsm < 2 : sel.zpsm == 0 && sel.notest;
@@ -2389,8 +2376,8 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				{
 					if (fast)
 					{
-						GSVector4i::storel((u8*)m_global.vm + za * 2, zs);
-						GSVector4i::storeh((u8*)m_global.vm + za * 2 + 16, zs);
+						GSVector4i::storel((uint8*)m_global.vm + za * 2, zs);
+						GSVector4i::storeh((uint8*)m_global.vm + za * 2 + 16, zs);
 					}
 					else
 					{
@@ -2404,8 +2391,8 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				{
 					if (fast)
 					{
-						if (fzm & 0x0f00) GSVector4i::storel((u8*)m_global.vm + za * 2, zs);
-						if (fzm & 0xf000) GSVector4i::storeh((u8*)m_global.vm + za * 2 + 16, zs);
+						if (fzm & 0x0f00) GSVector4i::storel((uint8*)m_global.vm + za * 2, zs);
+						if (fzm & 0xf000) GSVector4i::storeh((uint8*)m_global.vm + za * 2 + 16, zs);
 					}
 					else
 					{
@@ -2429,8 +2416,8 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 					{
 						case 0:
 						case 1:
-							rbd = fd.sll16(8).srl16(8);
-							gad = fd.srl16(8);
+							rbd = fd.sll16<8>().srl16<8>();
+							gad = fd.srl16<8>();
 							break;
 						case 2:
 							rbd = ((fd & 0x7c00) << 9) | ((fd & 0x001f) << 3);
@@ -2459,8 +2446,8 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 					{
 						switch(sel.abc)
 						{
-							case 0: a = gas.yywwlh().sll16(7); break;
-							case 1: a = gad.yywwlh().sll16(7); break;
+							case 0: a = gas.yywwlh().sll16<7>(); break;
+							case 1: a = gad.yywwlh().sll16<7>(); break;
 							case 2: a = m_global.afix; break;
 						}
 
@@ -2486,7 +2473,7 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 				if (sel.pabe)
 				{
-					mask = (gas << 8).sra32(31);
+					mask = (gas << 8).sra32<31>();
 
 					rb = rbs.blend8(rb, mask);
 				}
@@ -2586,8 +2573,8 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				{
 					if (fast)
 					{
-						GSVector4i::storel((u8*)m_global.vm + fa * 2, fs);
-						GSVector4i::storeh((u8*)m_global.vm + fa * 2 + 16, fs);
+						GSVector4i::storel((uint8*)m_global.vm + fa * 2, fs);
+						GSVector4i::storeh((uint8*)m_global.vm + fa * 2 + 16, fs);
 					}
 					else
 					{
@@ -2601,8 +2588,8 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 				{
 					if (fast)
 					{
-						if (fzm & 0x000f) GSVector4i::storel((u8*)m_global.vm + fa * 2, fs);
-						if (fzm & 0x00f0) GSVector4i::storeh((u8*)m_global.vm + fa * 2 + 16, fs);
+						if (fzm & 0x000f) GSVector4i::storel((uint8*)m_global.vm + fa * 2, fs);
+						if (fzm & 0x00f0) GSVector4i::storeh((uint8*)m_global.vm + fa * 2 + 16, fs);
 					}
 					else
 					{
@@ -2688,8 +2675,8 @@ void GSDrawScanline::DrawScanline(int pixels, int left, int top, const GSVertexS
 
 void GSDrawScanline::DrawEdge(int pixels, int left, int top, const GSVertexSW& scan)
 {
-	u32 zwrite = m_global.sel.zwrite;
-	u32 edge = m_global.sel.edge;
+	uint32 zwrite = m_global.sel.zwrite;
+	uint32 edge = m_global.sel.edge;
 
 	m_global.sel.zwrite = 0;
 	m_global.sel.edge = 1;
@@ -2787,20 +2774,20 @@ bool GSDrawScanline::TestAlpha(T& test, T& fm, T& zm, const T& ga)
 static const int s_offsets[] = {0, 2, 8, 10, 16, 18, 24, 26}; // columnTable16[0]
 
 template <class T>
-void GSDrawScanline::WritePixel(const T& src, int addr, int i, u32 psm)
+void GSDrawScanline::WritePixel(const T& src, int addr, int i, uint32 psm)
 {
-	u8* dst = (u8*)m_global.vm + addr * 2 + s_offsets[i] * 2;
+	uint8* dst = (uint8*)m_global.vm + addr * 2 + s_offsets[i] * 2;
 
 	switch (psm)
 	{
 		case 0:
-			*(u32*)dst = src.U32[i];
+			*(uint32*)dst = src.u32[i];
 			break;
 		case 1:
-			*(u32*)dst = (src.U32[i] & 0xffffff) | (*(u32*)dst & 0xff000000);
+			*(uint32*)dst = (src.u32[i] & 0xffffff) | (*(uint32*)dst & 0xff000000);
 			break;
 		case 2:
-			*(u16*)dst = src.U16[i * 2];
+			*(uint16*)dst = src.u16[i * 2];
 			break;
 	}
 }
@@ -2814,38 +2801,38 @@ void GSDrawScanline::DrawRect(const GSVector4i& r, const GSVertexSW& v)
 
 	// FIXME: sometimes the frame and z buffer may overlap, the outcome is undefined
 
-	u32 m;
+	uint32 m;
 
 #if _M_SSE >= 0x501
 	m = m_global.zm;
 #else
-	m = m_global.zm.U32[0];
+	m = m_global.zm.u32[0];
 #endif
 
 	if (m != 0xffffffff)
 	{
-		u32 z = v.t.U32[3]; // (u32)v.p.z;
+		uint32 z = v.t.u32[3]; // (uint32)v.p.z;
 
 		if (m_global.sel.zpsm != 2)
 		{
 			if (m == 0)
 			{
-				DrawRectT<u32, false>(m_global.zbo, r, z, m);
+				DrawRectT<uint32, false>(m_global.zbo, r, z, m);
 			}
 			else
 			{
-				DrawRectT<u32, true>(m_global.zbo, r, z, m);
+				DrawRectT<uint32, true>(m_global.zbo, r, z, m);
 			}
 		}
 		else
 		{
 			if ((m & 0xffff) == 0)
 			{
-				DrawRectT<u16, false>(m_global.zbo, r, z, m);
+				DrawRectT<uint16, false>(m_global.zbo, r, z, m);
 			}
 			else
 			{
-				DrawRectT<u16, true>(m_global.zbo, r, z, m);
+				DrawRectT<uint16, true>(m_global.zbo, r, z, m);
 			}
 		}
 	}
@@ -2853,12 +2840,12 @@ void GSDrawScanline::DrawRect(const GSVector4i& r, const GSVertexSW& v)
 #if _M_SSE >= 0x501
 	m = m_global.fm;
 #else
-	m = m_global.fm.U32[0];
+	m = m_global.fm.u32[0];
 #endif
 
 	if (m != 0xffffffff)
 	{
-		u32 c = (GSVector4i(v.c) >> 7).rgba32();
+		uint32 c = (GSVector4i(v.c) >> 7).rgba32();
 
 		if (m_global.sel.fba)
 		{
@@ -2869,11 +2856,11 @@ void GSDrawScanline::DrawRect(const GSVector4i& r, const GSVertexSW& v)
 		{
 			if (m == 0)
 			{
-				DrawRectT<u32, false>(m_global.fbo, r, c, m);
+				DrawRectT<uint32, false>(m_global.fbo, r, c, m);
 			}
 			else
 			{
-				DrawRectT<u32, true>(m_global.fbo, r, c, m);
+				DrawRectT<uint32, true>(m_global.fbo, r, c, m);
 			}
 		}
 		else
@@ -2882,18 +2869,18 @@ void GSDrawScanline::DrawRect(const GSVector4i& r, const GSVertexSW& v)
 
 			if ((m & 0xffff) == 0)
 			{
-				DrawRectT<u16, false>(m_global.fbo, r, c, m);
+				DrawRectT<uint16, false>(m_global.fbo, r, c, m);
 			}
 			else
 			{
-				DrawRectT<u16, true>(m_global.fbo, r, c, m);
+				DrawRectT<uint16, true>(m_global.fbo, r, c, m);
 			}
 		}
 	}
 }
 
 template <class T, bool masked>
-void GSDrawScanline::DrawRectT(const GSOffset& off, const GSVector4i& r, u32 c, u32 m)
+void GSDrawScanline::DrawRectT(const GSOffset& off, const GSVector4i& r, uint32 c, uint32 m)
 {
 	if (m == 0xffffffff)
 		return;
@@ -2910,7 +2897,7 @@ void GSDrawScanline::DrawRectT(const GSOffset& off, const GSVector4i& r, u32 c, 
 
 #endif
 
-	if (sizeof(T) == sizeof(u16))
+	if (sizeof(T) == sizeof(uint16))
 	{
 		color = color.xxzzlh();
 		mask = mask.xxzzlh();
@@ -2922,7 +2909,7 @@ void GSDrawScanline::DrawRectT(const GSOffset& off, const GSVector4i& r, u32 c, 
 	c = c & (~m);
 
 	if (masked)
-		ASSERT(mask.U32[0] != 0);
+		ASSERT(mask.u32[0] != 0);
 
 	GSVector4i br = r.ralign<Align_Inside>(GSVector2i(8 * 4 / sizeof(T), 8));
 
@@ -2946,7 +2933,7 @@ void GSDrawScanline::DrawRectT(const GSOffset& off, const GSVector4i& r, u32 c, 
 }
 
 template <class T, bool masked>
-void GSDrawScanline::FillRect(const GSOffset& off, const GSVector4i& r, u32 c, u32 m)
+void GSDrawScanline::FillRect(const GSOffset& off, const GSVector4i& r, uint32 c, uint32 m)
 {
 	if (r.x >= r.z)
 		return;

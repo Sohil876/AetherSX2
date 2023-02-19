@@ -19,6 +19,7 @@ static u32 PAUSE_TIME = 0;
 
 static void MultiPause()
 {
+#ifndef _M_ARM64
 	_mm_pause();
 	_mm_pause();
 	_mm_pause();
@@ -27,6 +28,16 @@ static void MultiPause()
 	_mm_pause();
 	_mm_pause();
 	_mm_pause();
+#else
+	__asm__ __volatile__ ("yield");
+	__asm__ __volatile__("yield");
+	__asm__ __volatile__("yield");
+	__asm__ __volatile__("yield");
+	__asm__ __volatile__("yield");
+	__asm__ __volatile__("yield");
+	__asm__ __volatile__("yield");
+	__asm__ __volatile__("yield");
+#endif
 }
 
 __noinline static void UpdatePauseTime()

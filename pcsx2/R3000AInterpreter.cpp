@@ -17,10 +17,10 @@
 #include "PrecompiledHeader.h"
 #include "IopCommon.h"
 #include "Config.h"
-#include "gui/AppCoreThread.h"
+#include "System/SysThreads.h"
 
 #include "R5900OpcodeTables.h"
-#include "DebugTools/Breakpoints.h"
+//#include "DebugTools/Breakpoints.h"
 
 using namespace R3000A;
 
@@ -130,6 +130,7 @@ void psxJALR()
 void psxBreakpoint(bool memcheck)
 {
 	u32 pc = psxRegs.pc;
+#if 0
 	if (CBreakPoints::CheckSkipFirst(BREAKPOINT_IOP, pc) != 0)
 		return;
 
@@ -141,12 +142,16 @@ void psxBreakpoint(bool memcheck)
 	}
 
 	CBreakPoints::SetBreakpointTriggered(true);
+#endif
+#ifndef PCSX2_CORE
 	GetCoreThread().PauseSelfDebug();
+#endif
 	throw Exception::ExitCpuExecute();
 }
 
 void psxMemcheck(u32 op, u32 bits, bool store)
 {
+#if 0
 	// compute accessed address
 	u32 start = psxRegs.GPR.r[(op >> 21) & 0x1F];
 	if ((s16)op != 0)
@@ -174,6 +179,7 @@ void psxMemcheck(u32 op, u32 bits, bool store)
 		if (start < check.end && check.start < end)
 			psxBreakpoint(true);
 	}
+#endif
 }
 
 void psxCheckMemcheck()

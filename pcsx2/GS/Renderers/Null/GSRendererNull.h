@@ -17,7 +17,7 @@
 
 #include "GS/Renderers/Common/GSRenderer.h"
 
-class GSRendererNull : public GSRenderer
+class GSRendererNull final : public GSRenderer
 {
 	class GSVertexTraceNull : public GSVertexTrace
 	{
@@ -29,18 +29,17 @@ class GSRendererNull : public GSRenderer
 	};
 
 protected:
-	void Draw()
+	void Draw() final
 	{
 	}
 
-	GSTexture* GetOutput(int i, int& y_offset)
+	GSTexture* GetOutput(int i, int& y_offset) final
 	{
 		return NULL;
 	}
 
 public:
-	GSRendererNull()
-		: GSRenderer()
-	{
-	}
+	GSRendererNull(std::unique_ptr<GSDevice> dev);
+
+	const char* GetName() const final;
 };

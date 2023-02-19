@@ -46,30 +46,28 @@ static Access* ReadIndexFromFile(const char* filename)
 	if (std::fread(fileId, GZIP_ID_LEN, 1, fp.get()) != 1 || std::memcmp(fileId, GZIP_ID, 4) != 0)
 	{
 		Console.Error("Error: Incompatible gzip index, please delete it manually: '%s'", filename);
-		return 0;
+		return nullptr;
 	}
 
-	Access* const index = (Access*)malloc(sizeof(Access));
+	std::unique_ptr<Access> index = std::make_unique<Access>();
 	const s64 datasize = size - GZIP_ID_LEN - sizeof(Access);
-	if (std::fread(index, sizeof(Access), 1, fp.get()) != 1 ||
+
+	if (std::fread(index.get(), sizeof(Access), 1, fp.get()) != 1 ||
 		datasize != static_cast<s64>(index->have) * static_cast<s64>(sizeof(Point)))
 	{
 		Console.Error("Error: unexpected size of gzip index, please delete it manually: '%s'.", filename);
-		free(index);
-		return 0;
+		return nullptr;
 	}
 
-	char* buffer = (char*)malloc(datasize);
-	if (std::fread(buffer, datasize, 1, fp.get()) != 1)
+	std::unique_ptr<char[]> buffer = std::make_unique<char[]>(datasize);
+	if (std::fread(buffer.get(), datasize, 1, fp.get()) != 1)
 	{
-		Console.Error("Error: failed read of gzip index, please delete it manually: '%s'.", filename);
-		free(buffer);
-		free(index);
-		return 0;
+		Console.Error("Error: failed to read gzip index, please delete it manually: '%s'.", filename);
+		return nullptr;
 	}
 
-	index->list = (Point*)buffer; // adjust list pointer
-	return index;
+	index->list = reinterpret_cast<Point*>(buffer.release()); // adjust list pointer
+	return index.release();
 }
 
 static void WriteIndexToFile(Access* index, const char* filename)
@@ -80,7 +78,7 @@ static void WriteIndexToFile(Access* index, const char* filename)
 		return;
 	}
 
-	auto fp = FileSystem::OpenManagedCFile(filename, "rb");
+	auto fp = FileSystem::OpenManagedCFile(filename, "wb");
 	if (!fp)
 		return;
 
@@ -88,7 +86,7 @@ static void WriteIndexToFile(Access* index, const char* filename)
 
 	Point* tmp = index->list;
 	index->list = 0; // current pointer is useless on disk, normalize it as 0.
-	std::fwrite((char*)index, sizeof(Access), 1, fp.get());
+	success = success && (std::fwrite((char*)index, sizeof(Access), 1, fp.get()) == 1);
 	index->list = tmp;
 
 	success = success && (std::fwrite((char*)index->list, sizeof(Point) * index->have, 1, fp.get()) == 1);
@@ -115,10 +113,10 @@ static wxString INDEX_TEMPLATE_KEY(L"$(f)");
 // No checks are performed if the result file name can be created.
 // If this proves useful, we can move it into Path:: . Right now there's no need.
 static wxString ApplyTemplate(const wxString& name, const wxDirName& base,
-							  const std::string& fileTemplate, const std::string& filename,
+							  const wxString& fileTemplate, const wxString& filename,
 							  bool canEndWithKey)
 {
-	wxString tem(StringUtil::UTF8StringToWxString(fileTemplate));
+	wxString tem(fileTemplate);
 	wxString key = INDEX_TEMPLATE_KEY;
 	tem = tem.Trim(true).Trim(false); // both sides
 
@@ -133,7 +131,7 @@ static wxString ApplyTemplate(const wxString& name, const wxDirName& base,
 		return L"";
 	}
 
-	wxString fname(StringUtil::UTF8StringToWxString(filename));
+	wxString fname(filename);
 	if (first > 0)
 		fname = Path::GetFilename(fname); // without path
 
@@ -173,11 +171,21 @@ static void TestTemplate(const wxDirName &base, const wxString &fname, bool canE
 
 static std::string iso2indexname(const std::string& isoname)
 {
+#ifdef __ANDROID__
+	std::string display_name(FileSystem::GetDisplayNameFromPath(isoname));
+	FileSystem::SanitizeFileName(display_name);
+	return Path::CombineStdString(EmuFolders::Cache, display_name + ".pindex.tmp");
+#else
+#ifndef PCSX2_CORE
 	//testTemplate(isoname);
 	wxDirName appRoot = // TODO: have only one of this in PCSX2. Right now have few...
 		(wxDirName)(wxFileName(wxStandardPaths::Get().GetExecutablePath()).GetPath());
+#else
+	const wxDirName& appRoot = EmuFolders::DataRoot;
+#endif
 	//TestTemplate(appRoot, isoname, false);
-	return StringUtil::wxStringToUTF8String(ApplyTemplate(L"gzip index", appRoot, EmuConfig.GzipIsoIndexTemplate, isoname, false));
+	return StringUtil::wxStringToUTF8String(ApplyTemplate(L"gzip index", appRoot, EmuConfig.GzipIsoIndexTemplate, StringUtil::UTF8StringToWxString(isoname), false));
+#endif
 }
 
 GzippedFileReader::GzippedFileReader(void)
@@ -300,7 +308,7 @@ bool GzippedFileReader::OkIndex()
 
 	// Try to read index from disk
 	const std::string indexfile(iso2indexname(m_filename));
-	if (indexfile.empty() == 0)
+	if (indexfile.empty())
 		return false; // iso2indexname(...) will print errors if it can't apply the template
 
 	if (FileSystem::FileExists(indexfile.c_str()) && (m_pIndex = ReadIndexFromFile(indexfile.c_str())))

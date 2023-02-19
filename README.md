@@ -1,52 +1,170 @@
-# PCSX2
+# AetherSX2
 
-![Windows Build Status](https://img.shields.io/github/workflow/status/PCSX2/pcsx2/%F0%9F%96%A5%EF%B8%8F%20Windows%20Builds/master?label=Windows%20Builds)
-![Linux Build Status](https://img.shields.io/github/workflow/status/PCSX2/pcsx2/%F0%9F%90%A7%20Linux%20Builds/master?label=Linux%20Builds)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/1f7c0d75fec74d6daa6adb084e5b4f71)](https://www.codacy.com/gh/PCSX2/pcsx2/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=PCSX2/pcsx2&amp;utm_campaign=Badge_Grade)
-[![Discord Server](https://img.shields.io/discord/309643527816609793?color=%235CA8FA&label=PCSX2%20Discord&logo=discord&logoColor=white)](https://discord.com/invite/TCz3t9k)
+### NEW Updates
 
-PCSX2 is a free and open-source PlayStation 2 (PS2) emulator. Its purpose is to emulate the PS2's hardware, using a combination of MIPS CPU [Interpreters](<https://en.wikipedia.org/wiki/Interpreter_(computing)>), [Recompilers](https://en.wikipedia.org/wiki/Dynamic_recompilation) and a [Virtual Machine](https://en.wikipedia.org/wiki/Virtual_machine) which manages hardware states and PS2 system memory. This allows you to play PS2 games on your PC, with many additional features and benefits.
+AetherSX2 development is indefinitely suspended.
+Due to neverending impersonating, complaints, demands, and now death threats, I'm done.
 
-## Project Details
+You can still download/use the app and it will continue to work for the forseeable future.
 
-The PCSX2 project has been running for more than ten years. Past versions could only run a few public domain game demos, but newer versions can run most games at full speed, including popular titles such as Final Fantasy X and Devil May Cry 3. Visit the [PCSX2 compatibility list](https://pcsx2.net/compatibility-list.html) to check the latest compatibility status of games (with more than 2500 titles tested), or ask for help in the [official forums](https://forums.pcsx2.net/).
+AetherSX2 was always meant to be a fun hobby for me, not profit driven. It doesn't make sense to continue working on a hobby which isn't fun anymore.
 
-The latest officially released stable version is version 1.6.0.
+Stay safe out there, and watch out for scammers, there seems to be a lot of them.
 
-Installers and binaries for both Windows and Linux are available from [our website](https://pcsx2.net/download.html).
+(e.g. there's multiple people claiming to represent AetherSX2 on various social media - they are not legit)
 
-Development builds are also available from [Github](https://github.com/PCSX2/pcsx2/releases). 
+Thanks to everyone who wasn't a d*ck for the last year.
 
-## System Requirements
+Current build downloads are still available at https://www.aethersx2.com/archive/ - please follow good security hygiene and don't install APKs from random sources.
 
-### Minimum
+Update 2023/01/10: I no longer have any active online presence in any community. Anyone claiming to be Tahlreth, or represent AetherSX2, is impersonating and scamming you.
+I hope the threats and hate will stop now.
 
-| Operating System                                                                                                       | CPU                                                                                                                                                                                           | GPU                                                                                                                                                                                               | RAM  |
-| ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| - Windows 8.1 or newer (32 or 64 bit) <br/> - Ubuntu 18.04/Debian or newer, Arch Linux, or other distro (32 or 64 bit) | - Supports SSE4.1 <br/> - [PassMark Single Thread Performance](https://www.cpubenchmark.net/singleThread.html) rating near or greater than 1600 <br/> - Two physical cores, with hyperthreading | - Direct3D10 support <br/> - OpenGL 3.x support <br/> - [PassMark G3D Mark](https://www.videocardbenchmark.net/high_end_gpus.html) rating around 3000 (GeForce GTX 750) <br/> - 2 GB Video Memory | 4 GB |
+---
 
-_Note: Recommended Single Thread Performance is based on moderately complex games. Games that pushed the PS2 hardware to its limits will struggle on CPUs at this level. Some release titles and 2D games which underutilized the PS2 hardware may run on CPUs rated as low as 1200. A quick reference for CPU **intensive games**: [Wiki](https://wiki.pcsx2.net/Category:CPU_intensive_games), [Forum](https://forums.pcsx2.net/Thread-LIST-The-Most-CPU-Intensive-Games) and CPU **light** games: [Forum](https://forums.pcsx2.net/Thread-LIST-Games-that-don-t-need-a-strong-CPU-to-emulate)_
+## Build Instructions
 
-### Recommended
+Please note that this is *not* a full source release for the library, only the LGPL sources, and parts of which that have been modified.
+Releasing full source code is *not* required by the LGPL, only that the closed source components can be re-linked/combined with
+the LGPL components and build instructions included as per section 4/5 of the license.
 
-| Operating System                                                                                 | CPU                                                                                                                                                                                                       | GPU                                                                                                                                                                                                   | RAM  |
-| ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| - Windows 10 (64 bit) <br/> - Ubuntu 19.04/Debian or newer, Arch Linux, or other distro (64 bit) | - Supports AVX2 <br/> - [PassMark Single Thread Performance](https://www.cpubenchmark.net/singleThread.html) rating near or greater than 2100 <br/> - Four physical cores, with or without hyperthreading | - Direct3D11 support <br/> - OpenGL 4.5 support <br/> - [PassMark G3D Mark](https://www.videocardbenchmark.net/high_end_gpus.html) rating around 6000 (GeForce GTX 1050 Ti) <br/> - 4 GB Video Memory | 8 GB |
+An apk suitable for injecting the recompiled library is provided as a convenience, as the library cannot be used outside
+of the Android app without modification.
 
-_Note: Recommended GPU is based on 3x Internal, ~1080p resolution requirements. Higher resolutions will require stronger cards; 6x Internal, ~4K resolution will require a [PassMark G3D Mark](https://www.videocardbenchmark.net/high_end_gpus.html) rating around 12000 (GeForce GTX 1070 Ti). Just like CPU requirements, this is also highly game dependent. A quick reference for GPU **intensive games**: [Wiki](https://wiki.pcsx2.net/Category:GPU_intensive_games)_
+You will need:
+ - Android SDK, Build Tools and NDK. We use SDK 31, build-tools 31 and NDK 23.1.7779620.
+ - A Linux machine. We used Ubuntu 20.04.3 LTS.
+ - CMake 3.22.0. You can get this from the Kitware repository for Ubuntu distros.
 
-### Technical Notes
+You should have:
+ - app-release-unsigned.apk: Unsigned APK containing compiled Java code without native library.
+ - aethersx2-libemucore.tar.xz: Archive of source code.
 
--   You need the [Visual C++ 2019 x86 Redistributables](https://support.microsoft.com/en-us/help/2977003/) to run PCSX2.
--   Windows XP and Direct3D9 support was dropped after stable release 1.4.0.
--   Windows 7 and Windows 8 support was dropped after stable release 1.6.0.
--   Make sure to update your operating system and drivers to ensure you have the best experience possible. Having a newer GPU is also recommended so you have the latest supported drivers.
--   Because of copyright issues, and the complexity of trying to work around it, you need a BIOS dump extracted from a legitimately-owned PS2 console to use the emulator. For more information about the BIOS and how to get it from your console, visit [this page](pcsx2/Docs/PCSX2_FAQ.md#question-13-where-do-i-get-a-ps2-bios).
--   PCSX2 uses two CPU cores for emulation by default. A third core can be used via the MTVU speed hack, which is compatible with most games. This can be a significant speedup on CPUs with 3+ cores, but it may be a slowdown on GS-limited games (or on CPUs with fewer than 2 cores). Software renderers will then additionally use however many rendering threads it is set to and will need higher core counts to run efficiently.
--   Requirements benchmarks are based on a statistic from the Passmark CPU bench marking software. When we say "STR", we are referring to Passmark's "Single Thread Rating" statistic. You can look up your CPU on [Passmark's website for CPUs](https://cpubenchmark.net) to see how it compares to PCSX2's requirements.
+We have verified that the library can be re-linked/reproduced on the above system configuration. If you use a different configuration,
+it is not guaranteed to be functional.
 
-### Screenshots
+Build steps:
 
-![Okami](https://pcsx2.net/images/stories/gitsnaps/okami_n1s.jpg "Okami") ![Final Fantasy XII](https://pcsx2.net/images/stories/gitsnaps/finalfantasy12izjs_s2.jpg "Final Fantasy XII") ![Shadow of the Colossus](https://pcsx2.net/images/stories/gitsnaps/sotc6s2.jpg "Shadow of the Colossus") ![DragonBall Z Budokai Tenkaichi 3](https://pcsx2.net/images/stories/gitsnaps/DBZ-BT-3s.jpg "DragonBall Z Budokai Tenkaichi 3") ![Kingdom Hearts 2: Final Mix](https://pcsx2.net/images/stories/gitsnaps/kh2_fm_n1s2.jpg "Kingdom Hearts 2: Final Mix") ![God of War 2](https://pcsx2.net/images/stories/gitsnaps/gow2_s2.jpg "God of War 2") ![Metal Gear Solid 3: Snake Eater](https://pcsx2.net/images/stories/gitsnaps/mgs3-1_s2.jpg "Metal Gear Solid 3: Snake Eater") ![Rogue Galaxy](https://pcsx2.net/images/stories/gitsnaps/rogue_galaxy_n1s2.jpg "Rogue Galaxy")
+1. Clone repo
+    ```bash
+    git clone https://github.com/AetherSX2/AetherSX2.git
+    cd AetherSX2
+    ```
+2. Create a build directory for the native library and change into it:
+    ```bash
+    mkdir build-android
+    cd build-android
+    ```
+3. Configure the build system. Change PATH_TO_NDK to whereever the NDK is installed:
+   ```bash
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=/PATH_TO_NDK/build/cmake/android.toolchain.cmake -DANDROID_PLATFORM=android-26 -DANDROID_ABI=arm64-v8a ..
+   ```
+4. Compile the native library: 
+   ```bash
+   make -j16
+   ```
+5. Create a directory for packaging the APK:
+   ```bash
+   mkdir apk
+   cd apk
+   ```
 
-Want more? [Check out the PCSX2 website](https://pcsx2.net/demo-videos-screenshots/screenshots.html).
+6. Copy the skeleton APK to this directory:
+   ```bash
+   cp PATH_TO_app-release-unsigned.apk aethersx2.apk
+   ```
+7. Copy the native library into the correct location: 
+   ```bash
+   mkdir -p lib/arm64-v8a
+   cp ../pcsx2/libemucore.so lib/arm64-v8a
+   ````
+8. Add the native library to the APK. zip is used instead of aapt because aapt will compress it:
+   ```bash
+   zip -0 aethersx2.apk lib/arm64-v8a/libemucore.so
+   ```
+9. Ensure the native library is aligned to a 4-byte boundary:
+   ```bash
+   zipalign -p 4 aethersx2.apk aethersx2-aligned.apk
+   ```
+10. Create a signing key for your build. Mark down the keystore password.
+    ```bash
+    keytool -genkey -v -keystore keyname.keystore -alias keyname -keyalg RSA -keysize 2048 -validity 10000
+    ```
+11. Sign the APK, replacing PASSWORD_TO_KEYSTORE with above: 
+    ```bash
+    apksigner sign --ks keyname.keystore --ks-pass "pass:PASSWORD_TO_KEYSTORE" --ks-key-alias keyname --out aethersx2-signed.apk --verbose aethersx2-aligned.apk
+    ```
+
+This will produce aethersx2-signed.apk, which can be installed on your device.
+
+## FAQ
+
+## What is it?
+AetherSX2 is an emulator of the PS Two console for the Android platform. You can play games which you have dumped from disc on your portable device.
+
+## Where is the APK?
+There is **no APK for download**. AetherSX2 is only distributed via the play store.
+
+## What are the requirements?
+The console is an **extremely** complex piece of hardware, with many very powerful components, even for today. You need a high end device to achieve good performance.
+
+We recommend at least a Snapdragon 845-equivalent device. This means 4 large cores (Cortex-A75 level). If you only have two big cores (e.g. Snapdragon 700 series SoCs, you should not enable multi-threaded VU, and performance will suffer as a result). Devices with Mali or PowerVR GPUs will run the app, but performance will be much lower than Adreno GPUs, and the Vulkan renderer will not be available. This is because they are missing a critical feature (dual-source blending).
+
+If you want to use the app on a slower device, you can try it, but games **will** run slow, especially heavier titles. You can try underclocking the CPU by setting the cycle rate to a negative number, and the cycle skip to a positive number in System settings, but this will cause games to lag internally at best, or crash at worst.
+
+### Expectations.
+This is a free app, worked on as a hobby in the developer's free time. At the time of writing, it is in very early stages and missing many useful features, however is usable for playing some games.
+
+It is not going to be perfect, far from it. I will continue to improve it when I have time, but please remember this is not my job, and to have realistic expectations, **especially if you do not have a high end device**.
+
+As it is an early preview, you should save your game regularly in case of crashes.
+
+## Disclaimers.
+AetherSX2 should only be used to play games you own and have dumped from disc yourself. To dump your games, you can use a tool such as ImgBurn to create a .iso for the disc, and then copy across it to your device over USB.
+
+PlayStation 2 and PS2 are registered trademarks of Sony Interactive Entertainment Europe Limited and in other regions. This app is not affiliated in any way with Sony Interactive Entertainment.
+
+### The app tells me I need a BIOS.
+
+Yes, you do. A BIOS image **is required** to play games and is not optional. This image should be dumped from your own console, using a homebrew application. There are plenty of guides available online on how to dump your console's BIOS.
+
+### My games are running slow/lagging.
+Different games have very different hardware requirements, due to how much they utilized the various components of the console. You can try underclocking the CPU by setting the cycle rate to a negative number, and the cycle skip to a positive number in System settings, but this will cause games to lag internally at best, or crash at worst.
+
+### How to improve performance?
+- Make sure fastmem is enabled in System settings.
+- Enable Multi-Threaded VU1 in System settings. This will cause lower performance if your device does not have at least three "big" CPU cores.
+- Use the Vulkan renderer if you have an Adreno GPU. Note that some games will perform better with OpenGL, and may not render correctly with Vulkan. Mali GPUs are not supported by the Vulkan renderer.
+- Underclock the emulated CPU by setting the cycle rate to a negative number, and cycle skip to a positive number in System settings.
+- For some games, enabling the Preload Textures and GPU Palette conversion options in Graphics settings can improve performance.
+- If the game slows down depending on the camera angle, this may be due to GS downloads, which are very slow on mobile GPUs. You can try disabling hardware readbacks in Graphics options, but this may create some glitches in effects.
+
+### How do I customize the touchscreen controller (position/scale)?
+Press the pause or back button while ingame, and tap the controls tab in the top-right corner. You can also add additional buttons for hotkeys here, e.g. fast forward, quick load/save, etc.
+
+### The app opens in portrait mode, how do I change it to landscape?
+Turn your device around if you have auto rotation enabled. You can also force it to always use landscape in the first page of App Settings.
+
+### My Bluetooth controller isn't working.
+Currently we only support a fixed controller mapping, which is determined by your Android vendor. Custom mappings for controllers are planned in the future.
+
+### I want to set different settings for each game.
+Long press the game in the game list/grid, tap Game Properties, and tap the Game Settings tab. If you want to change these settings while in-game, open the pause menu, and tap the info button in the top-right corner to access Game Properties.
+
+### My games have rendering glitches.
+Due to the complexity of the console's hardware, there are still plenty of issues which arise when using the hardware renderer. You can try using the software renderer for these games.
+
+### I want to save more than one state.
+Open the pause menu and tap Load/Save state, there are 10 slots + a quick save (for onscreen buttons).
+
+### I want copy my saves from another device.
+Currently you can only import an entire memory card at once; it is not possible to import individual saves. Swiping from the left in the game list will show an "Import Memory Card" option which you can use to import a *.ps2 image of a memory card.
+
+### Where are my saves located?
+Due to scoped storage on Android 11+, we cannot place your saves in a normal directory on external storage. However, with a file explorer app, you should be able to access the `Android/data/xyz.aethersx2.android` directory, in your primary storage volume, which contains your save states and memory cards. Note that accessing this directory requires granting additional permissions to your file manager on Android 11+.
+
+### How do I add covers to the game grid?
+Place cover images in the covers directory, located in the data directory mentioned above, with the file name as the game title or serial in jpg/png format. Alternatively, you can long press in the game list and select "Choose Cover Image" to import an image.
+
+### How do I create launcher shortcuts for games?
+Long press the game in the game list, and select "Create Launcher Shortcut".

@@ -18,8 +18,11 @@
 #include "System.h"
 
 #include "common/PersistentThread.h"
-#include "common/emitter/tools.h"
 #include "IPC.h"
+
+#if defined(_M_X86_32) || defined(_M_X86_64)
+#include "common/emitter/tools.h"
+#endif
 
 
 using namespace Threading;
@@ -171,7 +174,7 @@ protected:
 	virtual void OnResumeInThread(SystemsMask systemsToReinstate) = 0;
 };
 
-
+#ifndef PCSX2_CORE
 // --------------------------------------------------------------------------------------
 //  SysCoreThread class
 // --------------------------------------------------------------------------------------
@@ -204,7 +207,11 @@ protected:
 
 	wxString m_elf_override;
 
-	SSE_MXCSR m_mxcsr_saved;
+#if defined(_M_X86_32) || defined(_M_X86_64)
+  SSE_MXCSR m_mxcsr_saved;
+#elif defined(_M_ARM64)
+  AARCH64_FPCR m_fpcr_saved;
+#endif
 
 public:
 	explicit SysCoreThread();
@@ -249,6 +256,7 @@ private:
 };
 
 
+
 struct SysStateUnlockedParams
 {
 	SysStateUnlockedParams() {}
@@ -288,3 +296,5 @@ namespace IPCSettings
 {
 	extern unsigned int slot;
 };
+
+#endif

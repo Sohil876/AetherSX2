@@ -17,6 +17,7 @@
 #include "PrecompiledHeader.h"
 #include "Common.h"
 
+#include "common/StringUtil.h"
 #include "ps2/BiosTools.h"
 #include "R5900.h"
 #include "R3000A.h"
@@ -36,8 +37,11 @@
 #include "USB/USB.h"
 #include "Patch.h"
 #include "GameDatabase.h"
+#include "VMManager.h"
 
-#include "DebugTools/Breakpoints.h"
+//#include "DebugTools/Breakpoints.h"
+#include "DebugTools/MIPSAnalyst.h"
+#include "DebugTools/SymbolMap.h"
 #include "R5900OpcodeTables.h"
 
 using namespace R5900;	// for R5900 disasm tools
@@ -45,9 +49,9 @@ using namespace R5900;	// for R5900 disasm tools
 s32 EEsCycle;		// used to sync the IOP to the EE
 u32 EEoCycle;
 
-alignas(16) cpuRegisters cpuRegs;
-alignas(16) fpuRegisters fpuRegs;
-alignas(16) tlbs tlb[48];
+__aligned16 cpuRegisters cpuRegs;
+__aligned16 fpuRegisters fpuRegs;
+__aligned16 tlbs tlb[48];
 R5900cpu *Cpu = NULL;
 
 bool g_SkipBiosHack; // set at boot if the skip bios hack is on, reset before the game has started
@@ -90,7 +94,7 @@ void cpuReset()
 	fpuRegs.fprc[0]			= 0x00002e30; // fpu Revision..
 	fpuRegs.fprc[31]		= 0x01000001; // fpu Status/Control
 
-	g_nextEventCycle = cpuRegs.cycle + 4;
+	cpuRegs.nextEventCycle = cpuRegs.cycle + 4;
 	EEsCycle = 0;
 	EEoCycle = cpuRegs.cycle;
 
@@ -232,9 +236,9 @@ __fi void cpuSetNextEvent( u32 startCycle, s32 delta )
 	// typecast the conditional to signed so that things don't blow up
 	// if startCycle is greater than our next branch cycle.
 
-	if( (int)(g_nextEventCycle - startCycle) > delta )
+	if( (int)(cpuRegs.nextEventCycle - startCycle) > delta )
 	{
-		g_nextEventCycle = startCycle + delta;
+		cpuRegs.nextEventCycle = startCycle + delta;
 	}
 }
 
@@ -257,7 +261,7 @@ __fi int cpuTestCycle( u32 startCycle, s32 delta )
 // tells the EE to run the branch test the next time it gets a chance.
 __fi void cpuSetEvent()
 {
-	g_nextEventCycle = cpuRegs.cycle;
+	cpuRegs.nextEventCycle = cpuRegs.cycle;
 }
 
 __fi void cpuClearInt( uint i )
@@ -361,15 +365,12 @@ static bool cpuIntsEnabled(int Interrupt)
 		!cpuRegs.CP0.n.Status.b.EXL && (cpuRegs.CP0.n.Status.b.ERL == 0);
 }
 
-// if cpuRegs.cycle is greater than this cycle, should check cpuEventTest for updates
-u32 g_nextEventCycle = 0;
-
 // Shared portion of the branch test, called from both the Interpreter
 // and the recompiler.  (moved here to help alleviate redundant code)
 __fi void _cpuEventTest_Shared()
 {
 	eeEventTestIsActive = true;
-	g_nextEventCycle = cpuRegs.cycle + eeWaitCycles;
+	cpuRegs.nextEventCycle = cpuRegs.cycle + eeWaitCycles;
 
 	// ---- INTC / DMAC (CPU-level Exceptions) -----------------
 	// Done first because exceptions raised during event tests need to be postponed a few
@@ -547,7 +548,12 @@ void __fastcall eeGameStarting()
 		//Console.WriteLn( Color_Green, "(R5900) ELF Entry point! [addr=0x%08X]", ElfEntry );
 		g_GameStarted = true;
 		g_GameLoading = false;
+#ifndef PCSX2_CORE
 		GetCoreThread().GameStartingInThread();
+#else
+		VMManager::Internal::GameStartingOnCPUThread();
+#endif
+
 
 		// GameStartingInThread may issue a reset of the cpu and/or recompilers.  Check for and
 		// handle such things here:
@@ -605,7 +611,11 @@ int ParseArgumentString(u32 arg_block)
 // Called from recompilers; __fastcall define is mandatory.
 void __fastcall eeloadHook()
 {
+#ifndef PCSX2_CORE
 	const wxString &elf_override = GetCoreThread().GetElfOverride();
+#else
+	const wxString elf_override(StringUtil::UTF8StringToWxString(VMManager::Internal::GetElfOverride()));
+#endif
 
 	if (!elf_override.IsEmpty())
 		cdvdReloadElfInfo(L"host:" + elf_override);
@@ -715,7 +725,7 @@ void __fastcall eeloadHook()
 		}
 	}
 
-	if (!g_GameStarted && ((disctype == 2 && elfname == discelf.ToStdString()) || disctype == 1))
+	if (!g_GameStarted && (disctype == 2 || disctype == 1) && elfname == discelf)
 		g_GameLoading = true;
 }
 
@@ -783,18 +793,21 @@ inline bool isBranchOrJump(u32 addr)
 int isBreakpointNeeded(u32 addr)
 {
 	int bpFlags = 0;
+#if 0
 	if (CBreakPoints::IsAddressBreakPoint(BREAKPOINT_EE, addr))
 		bpFlags += 1;
 
 	// there may be a breakpoint in the delay slot
 	if (isBranchOrJump(addr) && CBreakPoints::IsAddressBreakPoint(BREAKPOINT_EE, addr+4))
 		bpFlags += 2;
+#endif
 
 	return bpFlags;
 }
 
 int isMemcheckNeeded(u32 pc)
 {
+#if 0
 	if (CBreakPoints::GetNumMemchecks() == 0)
 		return 0;
 	
@@ -807,6 +820,6 @@ int isMemcheckNeeded(u32 pc)
 
 	if (opcode.flags & IS_MEMORY)
 		return addr == pc ? 1 : 2;
-
+#endif
 	return 0;
 }

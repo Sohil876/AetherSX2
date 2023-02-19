@@ -271,8 +271,14 @@
     <Filter Include="System\Ps2\GS\Window">
       <UniqueIdentifier>{eaa22029-6839-4c09-93e1-faea8d8c0d7c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="System\Ps2\GS\GIF">
-      <UniqueIdentifier>{78f5077b-255e-435e-9a51-352171dfaee8}</UniqueIdentifier>
+    <Filter Include="Host">
+      <UniqueIdentifier>{65f21394-287a-471b-a0c1-d8f0d5d95a81}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="System\Ps2\GS\Renderers\Vulkan">
+      <UniqueIdentifier>{98829aa9-bb81-4564-bd6e-128719c4faa0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="arm64">
+      <UniqueIdentifier>{b30fa979-e49d-41f5-8422-9b04c275bca9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -281,9 +287,6 @@
     </None>
     <None Include="Docs\License.txt">
       <Filter>Docs</Filter>
-    </None>
-    <None Include="ps2\eeHwTraceLog.inl">
-      <Filter>System\Ps2\EmotionEngine\Hardware</Filter>
     </None>
     <None Include="x86\microVU_Alloc.inl">
       <Filter>System\Ps2\EmotionEngine\VU\Dynarec\microVU</Filter>
@@ -368,6 +371,45 @@
     </None>
     <None Include="GS\res\tfx.fx">
       <Filter>System\Ps2\GS\Shaders</Filter>
+    </None>
+    <None Include="arm64\microVU_Alloc.inl">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\microVU_Analyze.inl">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\microVU_Branch.inl">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\microVU_Clamp.inl">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\microVU_Compile.inl">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\microVU_Execute.inl">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\microVU_Flags.inl">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\microVU_Log.inl">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\microVU_Lower.inl">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\microVU_Macro.inl">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\microVU_Misc.inl">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\microVU_Tables.inl">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\microVU_Upper.inl">
+      <Filter>arm64</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -669,13 +711,13 @@
       <Filter>System\Ps2\IPU\mpeg2lib</Filter>
     </ClCompile>
     <ClCompile Include="GS.cpp">
-      <Filter>System\Ps2\GS\GIF</Filter>
+      <Filter>System\Ps2\GS</Filter>
     </ClCompile>
     <ClCompile Include="GSState.cpp">
-      <Filter>System\Ps2\GS\GIF</Filter>
+      <Filter>System\Ps2\GS</Filter>
     </ClCompile>
     <ClCompile Include="MTGS.cpp">
-      <Filter>System\Ps2\GS\GIF</Filter>
+      <Filter>System\Ps2\GS</Filter>
     </ClCompile>
     <ClCompile Include="DebugTools\DisR3000A.cpp">
       <Filter>System\Ps2\Debug</Filter>
@@ -888,7 +930,7 @@
       <Filter>AppHost\Panels</Filter>
     </ClCompile>
     <ClCompile Include="Gif_Unit.cpp">
-      <Filter>System\Ps2\GS\GIF</Filter>
+      <Filter>System\Ps2\GS</Filter>
     </ClCompile>
     <ClCompile Include="Gif_Logger.cpp">
       <Filter>System\Ps2\GS</Filter>
@@ -1487,6 +1529,9 @@
     <ClCompile Include="GS\Renderers\DX11\GSTexture11.cpp">
       <Filter>System\Ps2\GS\Renderers\Direct3D</Filter>
     </ClCompile>
+    <ClCompile Include="GS\Renderers\DX11\GSTextureCache11.cpp">
+      <Filter>System\Ps2\GS\Renderers\Direct3D</Filter>
+    </ClCompile>
     <ClCompile Include="GS\Renderers\DX11\GSTextureFX11.cpp">
       <Filter>System\Ps2\GS\Renderers\Direct3D</Filter>
     </ClCompile>
@@ -1500,6 +1545,9 @@
       <Filter>System\Ps2\GS\Renderers\OpenGL</Filter>
     </ClCompile>
     <ClCompile Include="GS\Renderers\OpenGL\GSShaderOGL.cpp">
+      <Filter>System\Ps2\GS\Renderers\OpenGL</Filter>
+    </ClCompile>
+    <ClCompile Include="GS\Renderers\OpenGL\GSTextureCacheOGL.cpp">
       <Filter>System\Ps2\GS\Renderers\OpenGL</Filter>
     </ClCompile>
     <ClCompile Include="GS\Renderers\OpenGL\GSTextureOGL.cpp">
@@ -1527,9 +1575,6 @@
       <Filter>System\Ps2\GS\Renderers\Software</Filter>
     </ClCompile>
     <ClCompile Include="GS\Renderers\SW\GSSetupPrimCodeGenerator.cpp">
-      <Filter>System\Ps2\GS\Renderers\Software</Filter>
-    </ClCompile>
-    <ClCompile Include="GS\Renderers\SW\GSSetupPrimCodeGenerator.all.cpp">
       <Filter>System\Ps2\GS\Renderers\Software</Filter>
     </ClCompile>
     <ClCompile Include="GS\Renderers\SW\GSTextureCacheSW.cpp">
@@ -1583,9 +1628,6 @@
     <ClCompile Include="GS\Renderers\Common\GSFunctionMap.cpp">
       <Filter>System\Ps2\GS\Renderers\Common</Filter>
     </ClCompile>
-    <ClCompile Include="GS\Renderers\Common\GSOsdManager.cpp">
-      <Filter>System\Ps2\GS\Renderers\Common</Filter>
-    </ClCompile>
     <ClCompile Include="GS\GSCapture.cpp">
       <Filter>System\Ps2\GS\Window</Filter>
     </ClCompile>
@@ -1628,12 +1670,8 @@
     <ClCompile Include="gui\wxSettingsInterface.cpp">
       <Filter>AppHost</Filter>
     </ClCompile>
-    <ClCompile Include="gui\wxGuiTools.cpp">
-      <Filter>AppHost</Filter>
-    </ClCompile>
-    <ClCompile Include="gui\wxHelpers.cpp">
-      <Filter>AppHost</Filter>
-    </ClCompile>
+    <ClCompile Include="gui\wxGuiTools.cpp" />
+    <ClCompile Include="gui\wxHelpers.cpp" />
     <ClCompile Include="gui\pxStaticText.cpp">
       <Filter>AppHost</Filter>
     </ClCompile>
@@ -1647,12 +1685,124 @@
     <ClCompile Include="PerformanceMetrics.cpp">
       <Filter>System</Filter>
     </ClCompile>
+    <ClCompile Include="HostDisplay.cpp">
+      <Filter>Host</Filter>
+    </ClCompile>
+    <ClCompile Include="Frontend\OpenGLHostDisplay.cpp">
+      <Filter>Host</Filter>
+    </ClCompile>
+    <ClCompile Include="Frontend\D3D11HostDisplay.cpp">
+      <Filter>Host</Filter>
+    </ClCompile>
+    <ClCompile Include="gui\AppHost.cpp">
+      <Filter>AppHost</Filter>
+    </ClCompile>
+    <ClCompile Include="Frontend\ImGuiManager.cpp">
+      <Filter>Host</Filter>
+    </ClCompile>
+    <ClCompile Include="Frontend\VulkanHostDisplay.cpp">
+      <Filter>Host</Filter>
+    </ClCompile>
+    <ClCompile Include="Frontend\imgui_impl_vulkan.cpp">
+      <Filter>Host</Filter>
+    </ClCompile>
+    <ClCompile Include="GS\Renderers\Vulkan\GSTextureCacheVK.cpp">
+      <Filter>System\Ps2\GS\Renderers\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="GS\Renderers\Vulkan\GSTextureVK.cpp">
+      <Filter>System\Ps2\GS\Renderers\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="GS\Renderers\Vulkan\GSDeviceVK.cpp">
+      <Filter>System\Ps2\GS\Renderers\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="GS\Renderers\Vulkan\GSRendererVK.cpp">
+      <Filter>System\Ps2\GS\Renderers\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\newVif_UnpackNEON.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\recVTLB.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\BaseblockEx.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iCOP0.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iCore-arm64.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iFPU.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iFPUd.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iMisc.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iMMI.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR3000A.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR3000Atables.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR5900.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR5900Arit.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR5900AritImm.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR5900Branch.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR5900Jump.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR5900LoadStore.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR5900Misc.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR5900Move.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR5900MultDiv.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR5900Shift.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\iR5900Templates.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\microVU.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\newVif_Dynarec.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="arm64\newVif_Unpack.cpp">
+      <Filter>arm64</Filter>
+    </ClCompile>
+    <ClCompile Include="GS\Renderers\SW\GSSetupPrimCodeGenerator.arm64.cpp">
+      <Filter>System\Ps2\GS\Renderers\Software</Filter>
+    </ClCompile>
+    <ClCompile Include="GS\Renderers\SW\GSDrawScanlineCodeGenerator.arm64.cpp">
+      <Filter>System\Ps2\GS\Renderers\Software</Filter>
+>>>>>>> 93a8038d9 (Add ARM64 dynarecs)
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Patch.h">
-      <Filter>Misc</Filter>
-    </ClInclude>
-    <ClInclude Include="PCSX2Base.h">
       <Filter>Misc</Filter>
     </ClInclude>
     <ClInclude Include="PrecompiledHeader.h">
@@ -2000,6 +2150,9 @@
     <ClInclude Include="GameDatabase.h">
       <Filter>Misc</Filter>
     </ClInclude>
+    <ClInclude Include="cheatscpp.h">
+      <Filter>Misc</Filter>
+    </ClInclude>
     <ClInclude Include="IPU\IPUdma.h">
       <Filter>System\Ps2\IPU</Filter>
     </ClInclude>
@@ -2010,7 +2163,7 @@
       <Filter>AppHost\Panels</Filter>
     </ClInclude>
     <ClInclude Include="Gif_Unit.h">
-      <Filter>System\Ps2\GS\GIF</Filter>
+      <Filter>System\Ps2\GS</Filter>
     </ClInclude>
     <ClInclude Include="x86\microVU_Profiler.h">
       <Filter>System\Ps2\EmotionEngine\VU\Dynarec\microVU</Filter>
@@ -2483,22 +2636,16 @@
     <ClInclude Include="PAD\Windows\PADRawInput.h">
       <Filter>System\Ps2\PAD</Filter>
     </ClInclude>
+    <ClInclude Include="PAD\Windows\PAD.h">
+      <Filter>System\Ps2\PAD</Filter>
+    </ClInclude>
     <ClInclude Include="PAD\Windows\resource_pad.h">
       <Filter>System\Ps2\PAD</Filter>
     </ClInclude>
     <ClInclude Include="GS\GS.h">
       <Filter>System\Ps2\GS</Filter>
     </ClInclude>
-    <ClInclude Include="GS\GSExtra.h">
-      <Filter>System\Ps2\GS</Filter>
-    </ClInclude>
-    <ClInclude Include="GS\GSIntrin.h">
-      <Filter>System\Ps2\GS</Filter>
-    </ClInclude>
-    <ClInclude Include="GS\GSGL.h">
-      <Filter>System\Ps2\GS</Filter>
-    </ClInclude>
-    <ClInclude Include="GS\GSRegs.h">
+    <ClInclude Include="GS\GS_types.h">
       <Filter>System\Ps2\GS</Filter>
     </ClInclude>
     <ClInclude Include="GS\GSAlignedClass.h">
@@ -2571,7 +2718,7 @@
       <Filter>System\Ps2\GS</Filter>
     </ClInclude>
     <ClInclude Include="GS.h">
-      <Filter>System\Ps2\GIF</Filter>
+      <Filter>System\Ps2</Filter>
     </ClInclude>
     <ClInclude Include="GS\Renderers\DX11\GSDevice11.h">
       <Filter>System\Ps2\GS\Renderers\Direct3D</Filter>
@@ -2580,6 +2727,9 @@
       <Filter>System\Ps2\GS\Renderers\Direct3D</Filter>
     </ClInclude>
     <ClInclude Include="GS\Renderers\DX11\GSTexture11.h">
+      <Filter>System\Ps2\GS\Renderers\Direct3D</Filter>
+    </ClInclude>
+    <ClInclude Include="GS\Renderers\DX11\GSTextureCache11.h">
       <Filter>System\Ps2\GS\Renderers\Direct3D</Filter>
     </ClInclude>
     <ClInclude Include="GS\Renderers\OpenGL\GLLoader.h">
@@ -2592,6 +2742,9 @@
       <Filter>System\Ps2\GS\Renderers\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="GS\Renderers\OpenGL\GSShaderOGL.h">
+      <Filter>System\Ps2\GS\Renderers\OpenGL</Filter>
+    </ClInclude>
+    <ClInclude Include="GS\Renderers\OpenGL\GSTextureCacheOGL.h">
       <Filter>System\Ps2\GS\Renderers\OpenGL</Filter>
     </ClInclude>
     <ClInclude Include="GS\Renderers\OpenGL\GSTextureOGL.h">
@@ -2687,9 +2840,6 @@
     <ClInclude Include="GS\Renderers\Common\GSFunctionMap.h">
       <Filter>System\Ps2\GS\Renderers\Common</Filter>
     </ClInclude>
-    <ClInclude Include="GS\Renderers\Common\GSOsdManager.h">
-      <Filter>System\Ps2\GS\Renderers\Common</Filter>
-    </ClInclude>
     <ClInclude Include="GS\GSCapture.h">
       <Filter>System\Ps2\GS\Window</Filter>
     </ClInclude>
@@ -2735,23 +2885,94 @@
     <ClInclude Include="MemoryCardFile.h">
       <Filter>System\Ps2\Iop</Filter>
     </ClInclude>
-    <ClInclude Include="Host.h">
-      <Filter>System\Include</Filter>
-    </ClInclude>
     <ClInclude Include="gui\wxSettingsInterface.h">
       <Filter>AppHost</Filter>
     </ClInclude>
-    <ClInclude Include="gui\wxGuiTools.h">
-      <Filter>AppHost</Filter>
-    </ClInclude>
+    <ClInclude Include="gui\wxGuiTools.h" />
     <ClInclude Include="gui\pxStaticText.h">
       <Filter>AppHost</Filter>
     </ClInclude>
-    <ClInclude Include="PAD\Gamepad.h">
-      <Filter>System\Ps2\PAD</Filter>
-    </ClInclude>
     <ClInclude Include="PerformanceMetrics.h">
-      <Filter>System</Filter>
+      <Filter>System\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Host.h">
+      <Filter>Host</Filter>
+    </ClInclude>
+    <ClInclude Include="HostDisplay.h">
+      <Filter>Host</Filter>
+    </ClInclude>
+    <ClInclude Include="Frontend\OpenGLHostDisplay.h">
+      <Filter>Host</Filter>
+    </ClInclude>
+    <ClInclude Include="Frontend\D3D11HostDisplay.h">
+      <Filter>Host</Filter>
+    </ClInclude>
+    <ClInclude Include="gui\AppHost.h">
+      <Filter>AppHost\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Frontend\ImGuiManager.h">
+      <Filter>Host</Filter>
+    </ClInclude>
+    <ClInclude Include="Host.h">
+      <Filter>Host</Filter>
+    </ClInclude>
+    <ClInclude Include="VMManager.h">
+      <Filter>System\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Frontend\VulkanHostDisplay.h">
+      <Filter>Host</Filter>
+    </ClInclude>
+    <ClInclude Include="GS\Renderers\Vulkan\GSRendererVK.h">
+      <Filter>System\Ps2\GS\Renderers\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="GS\Renderers\Vulkan\GSTextureCacheVK.h">
+      <Filter>System\Ps2\GS\Renderers\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="GS\Renderers\Vulkan\GSTextureVK.h">
+      <Filter>System\Ps2\GS\Renderers\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="GS\Renderers\Vulkan\GSDeviceVK.h">
+      <Filter>System\Ps2\GS\Renderers\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\newVif_UnpackNEON.h">
+      <Filter>arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\BaseblockEx.h">
+      <Filter>arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\iCOP0.h">
+      <Filter>arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\iCore-arm64.h">
+      <Filter>arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\iFPU.h">
+      <Filter>arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\iR3000A.h">
+      <Filter>arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\iR5900.h">
+      <Filter>arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\microVU.h">
+      <Filter>arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\microVU_IR.h">
+      <Filter>arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\microVU_Misc.h">
+      <Filter>arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\microVU_Profiler.h">
+      <Filter>arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\newVif.h">
+      <Filter>arm64</Filter>
+    </ClInclude>
+    <ClInclude Include="arm64\newVif_HashBucket.h">
+      <Filter>arm64</Filter>
+>>>>>>> 93a8038d9 (Add ARM64 dynarecs)
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -2916,3 +3137,4 @@
     </Manifest>
   </ItemGroup>
 </Project>
+

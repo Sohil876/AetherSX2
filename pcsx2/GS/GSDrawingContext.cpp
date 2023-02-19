@@ -15,7 +15,6 @@
 
 #include "PrecompiledHeader.h"
 #include "GSDrawingContext.h"
-#include "GSGL.h"
 #include "GS.h"
 
 static int findmax(int tl, int br, int limit, int wm, int minuv, int maxuv)
@@ -56,7 +55,7 @@ static int findmax(int tl, int br, int limit, int wm, int minuv, int maxuv)
 
 static int reduce(int uv, int size)
 {
-	while (size > 3 && (1 << (size - 1)) >= uv)
+	while (size > 3 && (1 << (size - 1)) >= uv + 1)
 	{
 		size--;
 	}
@@ -66,7 +65,7 @@ static int reduce(int uv, int size)
 
 static int extend(int uv, int size)
 {
-	while (size < 10 && (1 << size) < uv)
+	while (size < 10 && (1 << size) < uv + 1)
 	{
 		size++;
 	}
@@ -99,7 +98,7 @@ GIFRegTEX0 GSDrawingContext::GetSizeFixedTEX0(const GSVector4& st, bool linear, 
 		uvf += GSVector4(-0.5f, 0.5f).xxyy();
 	}
 
-	GSVector4i uv = GSVector4i(uvf.floor().xyzw(uvf.ceil()));
+	GSVector4i uv = GSVector4i(uvf.floor());
 
 	uv.x = findmax(uv.x, uv.z, (1 << tw) - 1, wms, minu, maxu);
 	uv.y = findmax(uv.y, uv.w, (1 << th) - 1, wmt, minv, maxv);
@@ -120,7 +119,8 @@ GIFRegTEX0 GSDrawingContext::GetSizeFixedTEX0(const GSVector4& st, bool linear, 
 		th = extend(uv.y, th);
 	}
 
-	if ((theApp.GetCurrentRendererType() == GSRendererType::OGL_SW) && ((int)TEX0.TW != tw || (int)TEX0.TH != th))
+	// TODO: Fix this
+	if (GSConfig.Renderer == GSRendererType::SW && ((int)TEX0.TW != tw || (int)TEX0.TH != th))
 	{
 		GL_DBG("FixedTEX0 %05x %d %d tw %d=>%d th %d=>%d st (%.0f,%.0f,%.0f,%.0f) uvmax %d,%d wm %d,%d (%d,%d,%d,%d)",
 			(int)TEX0.TBP0, (int)TEX0.TBW, (int)TEX0.PSM,
@@ -154,7 +154,7 @@ void GSDrawingContext::ComputeFixedTEX0(const GSVector4& st)
 	int maxu = (int)CLAMP.MAXU;
 	int maxv = (int)CLAMP.MAXV;
 
-	GSVector4i uv = GSVector4i(st.floor().xyzw(st.ceil()));
+	GSVector4i uv = GSVector4i(st.floor());
 
 	uv.x = findmax(uv.x, uv.z, (1 << TEX0.TW) - 1, wms, minu, maxu);
 	uv.y = findmax(uv.y, uv.w, (1 << TEX0.TH) - 1, wmt, minv, maxv);

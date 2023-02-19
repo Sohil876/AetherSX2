@@ -14,14 +14,14 @@
  */
 
 #include "PrecompiledHeader.h"
-#include "GSIntrin.h"
+#include "GS_types.h"
 
 #pragma once
 
 #ifdef _WIN32
-	#define gsforceinline __forceinline
+#  define gsforceinline __forceinline
 #else
-	#define gsforceinline __forceinline __inline__
+#  define gsforceinline __forceinline __inline__
 #endif
 
 enum Align_Mode
@@ -99,10 +99,15 @@ class GSVector8i;
 #undef _d
 
 // Position and order is important
+#ifdef _M_ARM64
+#include "GSVector4i_arm64.h"
+#include "GSVector4_arm64.h"
+#else
 #include "GSVector4i.h"
 #include "GSVector4.h"
 #include "GSVector8i.h"
 #include "GSVector8.h"
+#endif
 
 #include "common/Dependencies.h"
 
@@ -110,12 +115,20 @@ class GSVector8i;
 
 gsforceinline GSVector4i::GSVector4i(const GSVector4& v, bool truncate)
 {
+#ifndef _M_ARM64
 	m = truncate ? _mm_cvttps_epi32(v) : _mm_cvtps_epi32(v);
+#else
+	v4s = vcvtq_s32_f32(v.v4s);
+#endif
 }
 
 gsforceinline GSVector4::GSVector4(const GSVector4i& v)
 {
+#ifndef _M_ARM64
 	m = _mm_cvtepi32_ps(v);
+#else
+	v4s = vcvtq_f32_s32(v.v4s);
+#endif
 }
 
 #if _M_SSE >= 0x501
@@ -136,12 +149,20 @@ gsforceinline GSVector8::GSVector8(const GSVector8i& v)
 
 gsforceinline GSVector4i GSVector4i::cast(const GSVector4& v)
 {
+#ifndef _M_ARM64
 	return GSVector4i(_mm_castps_si128(v.m));
+#else
+	return GSVector4i(vreinterpretq_s32_f32(v.v4s));
+#endif
 }
 
 gsforceinline GSVector4 GSVector4::cast(const GSVector4i& v)
 {
+#ifndef _M_ARM64
 	return GSVector4(_mm_castsi128_ps(v.m));
+#else
+	return GSVector4(vreinterpretq_f32_s32(v.v4s));
+#endif
 }
 
 #if _M_SSE >= 0x500

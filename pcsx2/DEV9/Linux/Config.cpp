@@ -27,6 +27,8 @@
 #include <pwd.h>
 #include <string.h>
 
+#ifndef __ANDROID__
+
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 
@@ -238,3 +240,14 @@ void LoadConf()
 
 	LoadDnsHosts();
 }
+
+#else
+
+void SaveConf()
+{
+}
+void LoadConf()
+{
+}
+
+#endif

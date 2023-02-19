@@ -60,7 +60,9 @@ void Threading::Semaphore::Post(int multiple)
 
 void Threading::Semaphore::WaitWithoutYield()
 {
+#ifndef __ANDROID__
 	pxAssertMsg(!wxThread::IsMain(), "Unyielding semaphore wait issued from the main/gui thread.  Please use Wait() instead.");
+#endif
 	sem_wait(&m_sema);
 }
 
@@ -149,20 +151,28 @@ bool Threading::Semaphore::Wait(const wxTimeSpan& timeout)
 // to do a lot of no-cancel waits in a tight loop worker thread, for example.
 void Threading::Semaphore::WaitNoCancel()
 {
+#ifndef __ANDROID__
 	int oldstate;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+#endif
 	//WaitWithoutYield();
 	Wait();
+#ifndef __ANDROID__
 	pthread_setcancelstate(oldstate, NULL);
+#endif
 }
 
 void Threading::Semaphore::WaitNoCancel(const wxTimeSpan& timeout)
 {
+#ifndef __ANDROID__
 	int oldstate;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+#endif
 	//WaitWithoutYield( timeout );
 	Wait(timeout);
+#ifndef __ANDROID__
 	pthread_setcancelstate(oldstate, NULL);
+#endif
 }
 
 bool Threading::Semaphore::TryWait()

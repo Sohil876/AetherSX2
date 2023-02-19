@@ -15,27 +15,7 @@
 
 #pragma once
 
-#include <wx/string.h>
-#include <wx/tokenzr.h>
-#include <wx/intl.h>
-#include <wx/log.h>
-#include <wx/filename.h>
-#include "common/pxStreams.h"
-#include "common/Console.h"
-#include <stdio.h>
-#include <assert.h>
-
-#include <array>
-#include <vector>
-#include <map>
-#include <string>
-#include <memory>
-#include <mutex>
-#include <queue>
-
-#include "../Gamepad.h"
-
-struct HostKeyEvent;
+#include "PAD.h"
 
 #ifdef __linux__
 // Seriously why there is no standard

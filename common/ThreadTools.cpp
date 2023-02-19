@@ -99,7 +99,9 @@ static void unmake_curthread_key()
 
 void Threading::pxTestCancel()
 {
+#ifndef __ANDROID__
 	pthread_testcancel();
+#endif
 }
 
 // Returns a handle to the current persistent thread.  If the current thread does not belong
@@ -258,8 +260,23 @@ void Threading::pxThread::Start()
 
 	m_except = NULL;
 
+	pthread_attr_t attrs;
+	bool has_attributes = false;
+
+	if (m_stack_size != 0)
+	{
+		has_attributes = true;
+		pthread_attr_init(&attrs);
+	}
+	if (m_stack_size != 0)
+		pthread_attr_setstacksize(&attrs, m_stack_size);
+
 	pxThreadLog.Write(GetName(), L"Calling pthread_create...");
-	if (pthread_create(&m_thread, NULL, _internal_callback, this) != 0)
+	const int create_result = pthread_create(&m_thread, has_attributes ? &attrs : NULL, _internal_callback, this);
+	if (has_attributes)
+		pthread_attr_destroy(&attrs);
+	
+	if (create_result != 0)
 		throw Exception::ThreadCreationError(this).SetDiagMsg(L"Thread creation error: " + wxString(std::strerror(errno)));
 
 #ifdef ASAN_WORKAROUND
@@ -321,8 +338,12 @@ bool Threading::pxThread::_basecancel()
 		return false;
 	}
 
+#ifndef __ANDROID__
 	pthread_cancel(m_thread);
 	return true;
+#else
+	return false;
+#endif
 }
 
 // Remarks:
@@ -560,7 +581,9 @@ bool Threading::pxThread::WaitOnSelf(Mutex& mutex, const wxTimeSpan& timeout) co
 void Threading::pxThread::TestCancel() const
 {
 	AffinityAssert_AllowFromSelf(pxDiagSpot);
+#ifndef __ANDROID__
 	pthread_testcancel();
+#endif
 }
 
 // Executes the virtual member method

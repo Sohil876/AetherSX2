@@ -16,7 +16,7 @@
 #include "PrecompiledHeader.h"
 #include "CDVD/CDVDdiscReader.h"
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
 #include <libudev.h>
 #include <linux/cdrom.h>
 #endif
@@ -27,7 +27,7 @@
 
 std::vector<std::string> GetOpticalDriveList()
 {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
 	udev* udev_context = udev_new();
 	if (!udev_context)
 		return {};
@@ -65,7 +65,7 @@ void GetValidDrive(std::string& drive)
 {
 	if (!drive.empty())
 	{
-#ifdef __linux__
+#if defined(__linux__) && !defined(__ANDROID__)
 		int fd = open(drive.c_str(), O_RDONLY | O_NONBLOCK);
 		if (fd != -1)
 		{

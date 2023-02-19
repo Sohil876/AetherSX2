@@ -75,7 +75,7 @@ struct gifStruct {
 	bool gifmfifoirq;
 };
 
-alignas(16) extern gifStruct gif;
+extern __aligned16 gifStruct gif;
 
 struct GIF_Fifo
 {

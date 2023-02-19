@@ -61,7 +61,7 @@ bool StreamException_LogLastError( const wxString& streamname, const wxChar* act
 	}
 	catch( Exception::BadStream& ex )
 	{
-		Console.WriteLn( Color_Yellow, L"%s: %s", action, ex.FormatDiagnosticMessage().c_str() );
+		Console.WriteLn( Color_Yellow, L"%s: %s", action, static_cast<const wchar_t*>(ex.FormatDiagnosticMessage().c_str()) );
 		return true;
 	}
 	return false;

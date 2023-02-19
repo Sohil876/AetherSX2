@@ -33,6 +33,8 @@
 #include <thread>
 
 static constexpr char GAMEDB_YAML_FILE_NAME[] = "GameIndex.yaml";
+static constexpr char GAMEDB_CACHE_FILE_NAME[] = "gamedb.cache";
+static constexpr u64 CACHE_FILE_MAGIC = UINT64_C(0x47414D4544423031); // GAMEDB01
 
 static std::unordered_map<std::string, GameDatabaseSchema::GameEntry> s_game_db;
 static std::once_flag s_load_once_flag;
@@ -42,6 +44,14 @@ static std::string strToLower(std::string str)
 	std::transform(str.begin(), str.end(), str.begin(),
 		[](unsigned char c) { return std::tolower(c); });
 	return str;
+}
+
+static bool compareStrNoCase(const std::string& str1, const std::string& str2)
+{
+	return std::equal(str1.begin(), str1.end(), str2.begin(),
+		[](char a, char b) {
+			return tolower(a) == tolower(b);
+		});
 }
 
 std::string GameDatabaseSchema::GameEntry::MemcardFiltersAsString() const
@@ -127,63 +137,51 @@ static bool parseAndInsert(std::string serial, const YAML::Node& node)
 		}
 
 		// Validate game fixes, invalid ones will be dropped!
-		if (auto gameFixes = node["gameFixes"])
+		for (std::string& fix : node["gameFixes"].as<std::vector<std::string>>(std::vector<std::string>()))
 		{
-			gameEntry.gameFixes.reserve(gameFixes.size());
-			for (std::string& fix : gameFixes.as<std::vector<std::string>>(std::vector<std::string>()))
+			bool fixValidated = false;
+			for (GamefixId id = GamefixId_FIRST; id < pxEnumEnd; id++)
 			{
-				// Enum values don't end with Hack, but gamedb does, so remove it before comparing.
-				bool fixValidated = false;
-				if (StringUtil::EndsWith(fix, "Hack"))
+				std::string validFix = fmt::format("{}Hack", wxString(EnumToString(id)));
+				if (validFix == fix)
 				{
-					fix.erase(fix.size() - 4);
-					for (GamefixId id = GamefixId_FIRST; id < pxEnumEnd; id++)
-					{
-						if (fix.compare(EnumToString(id)) == 0 &&
-								std::find(gameEntry.gameFixes.begin(), gameEntry.gameFixes.end(), id) == gameEntry.gameFixes.end())
-						{
-							gameEntry.gameFixes.push_back(id);
-							fixValidated = true;
-							break;
-						}
-					}
+					fixValidated = true;
+					break;
 				}
-
-				if (!fixValidated)
-				{
-					Console.Error("[GameDB] Invalid gamefix: '%s', specified for serial: '%s'. Dropping!", fix.c_str(), serial.c_str());
-				}
+			}
+			if (fixValidated)
+			{
+				gameEntry.gameFixes.push_back(fix);
+			}
+			else
+			{
+				Console.Error(fmt::format("[GameDB] Invalid gamefix: '{}', specified for serial: '{}'. Dropping!", fix, serial));
 			}
 		}
 
 		// Validate speed hacks, invalid ones will be dropped!
-		if (auto speedHacksNode = node["speedHacks"])
+		if (YAML::Node speedHacksNode = node["speedHacks"])
 		{
-			gameEntry.speedHacks.reserve(speedHacksNode.size());
 			for (const auto& entry : speedHacksNode)
 			{
+				std::string speedHack = entry.first.as<std::string>();
 				bool speedHackValidated = false;
-				std::string speedHack(entry.first.as<std::string>());
-
-				// Same deal with SpeedHacks
-				if (StringUtil::EndsWith(speedHack, "SpeedHack"))
+				for (SpeedhackId id = SpeedhackId_FIRST; id < pxEnumEnd; id++)
 				{
-					speedHack.erase(speedHack.size() - 9);
-					for (SpeedhackId id = SpeedhackId_FIRST; id < pxEnumEnd; id++)
+					std::string validSpeedHack = fmt::format("{}SpeedHack", wxString(EnumToString(id)));
+					if (validSpeedHack == speedHack)
 					{
-						if (speedHack.compare(EnumToString(id)) == 0 &&
-								std::none_of(gameEntry.speedHacks.begin(), gameEntry.speedHacks.end(), [id](const auto& it) { return it.first == id; }))
-						{
-							gameEntry.speedHacks.emplace_back(id, entry.second.as<int>());
-							speedHackValidated = true;
-							break;
-						}
+						speedHackValidated = true;
+						break;
 					}
 				}
-
-				if (!speedHackValidated)
+				if (speedHackValidated)
 				{
-					Console.Error("[GameDB] Invalid speedhack: '%s', specified for serial: '%s'. Dropping!", speedHack.c_str(), serial.c_str());
+					gameEntry.speedHacks[speedHack] = entry.second.as<int>();
+				}
+				else
+				{
+					Console.Error(fmt::format("[GameDB] Invalid speedhack: '{}', specified for serial: '{}'. Dropping!", speedHack, serial));
 				}
 			}
 		}
@@ -267,10 +265,270 @@ static bool LoadYamlFile()
 	return true;
 }
 
-void GameDatabase::EnsureLoaded()
+static bool ReadString(std::FILE* stream, std::string* dest)
 {
-	std::call_once(s_load_once_flag, []() {
-		Common::Timer timer;
+	u32 size;
+	if (std::fread(&size, sizeof(size), 1, stream) != 1)
+		return false;
+
+	dest->resize(size);
+	if (size > 0 && std::fread(dest->data(), size, 1, stream) != 1)
+		return false;
+
+	return true;
+}
+
+static bool ReadS8(std::FILE* stream, s8* dest)
+{
+	return std::fread(dest, sizeof(s8), 1, stream) > 0;
+}
+
+static bool ReadU8(std::FILE* stream, u8* dest)
+{
+	return std::fread(dest, sizeof(u8), 1, stream) > 0;
+}
+
+static bool ReadS32(std::FILE* stream, s32* dest)
+{
+	return std::fread(dest, sizeof(s32), 1, stream) > 0;
+}
+
+static bool ReadU32(std::FILE* stream, u32* dest)
+{
+	return std::fread(dest, sizeof(u32), 1, stream) > 0;
+}
+
+static bool ReadS64(std::FILE* stream, s64* dest)
+{
+	return std::fread(dest, sizeof(s64), 1, stream) > 0;
+}
+
+static bool ReadU64(std::FILE* stream, u64* dest)
+{
+	return std::fread(dest, sizeof(u64), 1, stream) > 0;
+}
+
+static bool WriteString(std::FILE* stream, const std::string& str)
+{
+	const u32 size = static_cast<u32>(str.size());
+	return (std::fwrite(&size, sizeof(size), 1, stream) > 0 &&
+			(size == 0 || std::fwrite(str.data(), size, 1, stream) > 0));
+}
+
+static bool WriteS8(std::FILE* stream, s8 dest)
+{
+	return std::fwrite(&dest, sizeof(s8), 1, stream) > 0;
+}
+
+static bool WriteU8(std::FILE* stream, u8 dest)
+{
+	return std::fwrite(&dest, sizeof(u8), 1, stream) > 0;
+}
+
+static bool WriteS32(std::FILE* stream, s32 dest)
+{
+	return std::fwrite(&dest, sizeof(s32), 1, stream) > 0;
+}
+
+static bool WriteU32(std::FILE* stream, u32 dest)
+{
+	return std::fwrite(&dest, sizeof(u32), 1, stream) > 0;
+}
+
+static bool WriteS64(std::FILE* stream, s64 dest)
+{
+	return std::fwrite(&dest, sizeof(s64), 1, stream) > 0;
+}
+
+static bool WriteU64(std::FILE* stream, u64 dest)
+{
+	return std::fwrite(&dest, sizeof(u64), 1, stream) > 0;
+}
+
+static s64 GetExpectedMTime()
+{
+	const std::string yaml_filename(Path::CombineStdString(EmuFolders::Resources, GAMEDB_YAML_FILE_NAME));
+
+	FILESYSTEM_STAT_DATA yaml_sd;
+	if (!FileSystem::StatFile(yaml_filename.c_str(), &yaml_sd))
+		return -1;
+
+	return yaml_sd.ModificationTime;
+}
+
+static bool CheckAndLoad(const char* cached_filename, s64 expected_mtime)
+{
+	auto fp = FileSystem::OpenManagedCFile(cached_filename, "rb");
+	if (!fp)
+		return false;
+
+	u64 file_signature;
+	s64 file_mtime, start_pos, file_size;
+	if (!ReadU64(fp.get(), &file_signature) || file_signature != CACHE_FILE_MAGIC ||
+		!ReadS64(fp.get(), &file_mtime) || file_mtime != expected_mtime ||
+		(start_pos = FileSystem::FTell64(fp.get())) < 0 || FileSystem::FSeek64(fp.get(), 0, SEEK_END) != 0 ||
+		(file_size = FileSystem::FTell64(fp.get())) < 0 || FileSystem::FSeek64(fp.get(), start_pos, SEEK_SET) != 0)
+	{
+		return false;
+	}
+
+	while (FileSystem::FTell64(fp.get()) != file_size)
+	{
+		std::string serial;
+		GameDatabaseSchema::GameEntry entry;
+		u8 compat;
+		s8 ee_round, ee_clamp, vu_round, vu_clamp;
+		u32 game_fix_count, speed_hack_count, memcard_filter_count, patch_count;
+
+		if (!ReadString(fp.get(), &serial) ||
+			!ReadString(fp.get(), &entry.name) ||
+			!ReadString(fp.get(), &entry.region) ||
+			!ReadU8(fp.get(), &compat) || compat > static_cast<u8>(GameDatabaseSchema::Compatibility::Perfect) ||
+			!ReadS8(fp.get(), &ee_round) || ee_round < static_cast<s8>(GameDatabaseSchema::RoundMode::Undefined) || ee_round > static_cast<s8>(GameDatabaseSchema::RoundMode::ChopZero) ||
+			!ReadS8(fp.get(), &ee_clamp) || ee_clamp < static_cast<s8>(GameDatabaseSchema::ClampMode::Undefined) || ee_clamp > static_cast<s8>(GameDatabaseSchema::ClampMode::Full) ||
+			!ReadS8(fp.get(), &vu_round) || vu_round < static_cast<s8>(GameDatabaseSchema::RoundMode::Undefined) || vu_round > static_cast<s8>(GameDatabaseSchema::RoundMode::ChopZero) ||
+			!ReadS8(fp.get(), &vu_clamp) || vu_clamp < static_cast<s8>(GameDatabaseSchema::ClampMode::Undefined) || vu_clamp > static_cast<s8>(GameDatabaseSchema::ClampMode::Full) ||
+			!ReadU32(fp.get(), &game_fix_count) ||
+			!ReadU32(fp.get(), &speed_hack_count) ||
+			!ReadU32(fp.get(), &memcard_filter_count) ||
+			!ReadU32(fp.get(), &patch_count))
+		{
+			Console.Error("GameDB: Read error while loading entry");
+			return false;
+		}
+
+		entry.compat = static_cast<GameDatabaseSchema::Compatibility>(compat);
+		entry.eeRoundMode = static_cast<GameDatabaseSchema::RoundMode>(ee_round);
+		entry.eeClampMode = static_cast<GameDatabaseSchema::ClampMode>(ee_clamp);
+		entry.vuRoundMode = static_cast<GameDatabaseSchema::RoundMode>(vu_round);
+		entry.vuClampMode = static_cast<GameDatabaseSchema::ClampMode>(vu_clamp);
+
+		entry.gameFixes.resize(game_fix_count);
+		for (u32 i = 0; i < game_fix_count; i++)
+		{
+			if (!ReadString(fp.get(), &entry.gameFixes[i]))
+				return false;
+		}
+
+		for (u32 i = 0; i < speed_hack_count; i++)
+		{
+			std::string speed_hack_name;
+			s32 speed_hack_value;
+			if (!ReadString(fp.get(), &speed_hack_name) || !ReadS32(fp.get(), &speed_hack_value))
+				return false;
+			entry.speedHacks.emplace(std::move(speed_hack_name), speed_hack_value);
+		}
+
+		entry.memcardFilters.resize(memcard_filter_count);
+		for (u32 i = 0; i < memcard_filter_count; i++)
+		{
+			if (!ReadString(fp.get(), &entry.memcardFilters[i]))
+				return false;
+		}
+
+		for (u32 i = 0; i < patch_count; i++)
+		{
+			std::string patch_crc;
+			u32 patch_line_count;
+			if (!ReadString(fp.get(), &patch_crc) || !ReadU32(fp.get(), &patch_line_count))
+				return false;
+
+			GameDatabaseSchema::Patch patch_lines;
+			patch_lines.resize(patch_line_count);
+			for (u32 j = 0; j < patch_line_count; j++)
+			{
+				if (!ReadString(fp.get(), &patch_lines[j]))
+					return false;
+			}
+
+			entry.patches.emplace(std::move(patch_crc), std::move(patch_lines));
+		}
+
+		s_game_db.emplace(std::move(serial), std::move(entry));
+	}
+
+	return true;
+}
+
+static bool SaveCache(const char* cached_filename, s64 mtime)
+{
+	auto fp = FileSystem::OpenManagedCFile(cached_filename, "wb");
+	if (!fp)
+		return false;
+
+	if (!WriteU64(fp.get(), CACHE_FILE_MAGIC) || !WriteS64(fp.get(), mtime))
+		return false;
+
+	for (const auto& it : s_game_db)
+	{
+		const GameDatabaseSchema::GameEntry& entry = it.second;
+		const u8 compat = static_cast<u8>(entry.compat);
+		const s8 ee_round = static_cast<s8>(entry.eeRoundMode);
+		const s8 ee_clamp = static_cast<s8>(entry.eeClampMode);
+		const s8 vu_round = static_cast<s8>(entry.vuRoundMode);
+		const s8 vu_clamp = static_cast<s8>(entry.vuClampMode);
+
+		if (!WriteString(fp.get(), it.first) ||
+			!WriteString(fp.get(), entry.name) ||
+			!WriteString(fp.get(), entry.region) ||
+			!WriteU8(fp.get(), compat) ||
+			!WriteS8(fp.get(), ee_round) ||
+			!WriteS8(fp.get(), ee_clamp) ||
+			!WriteS8(fp.get(), vu_round) ||
+			!WriteS8(fp.get(), vu_clamp) ||
+			!WriteU32(fp.get(), static_cast<u32>(entry.gameFixes.size())) ||
+			!WriteU32(fp.get(), static_cast<u32>(entry.speedHacks.size())) ||
+			!WriteU32(fp.get(), static_cast<u32>(entry.memcardFilters.size())) ||
+			!WriteU32(fp.get(), static_cast<u32>(entry.patches.size())))
+		{
+			return false;
+		}
+
+		for (const std::string& it : entry.gameFixes)
+		{
+			if (!WriteString(fp.get(), it))
+				return false;
+		}
+
+		for (const auto& it : entry.speedHacks)
+		{
+			if (!WriteString(fp.get(), it.first) || !WriteS32(fp.get(), it.second))
+				return false;
+		}
+
+		for (const std::string& it : entry.memcardFilters)
+		{
+			if (!WriteString(fp.get(), it))
+				return false;
+		}
+
+		for (const auto& it : entry.patches)
+		{
+			if (!WriteString(fp.get(), it.first) || !WriteU32(fp.get(), static_cast<u32>(it.second.size())))
+				return false;
+
+			for (const std::string& jt : it.second)
+			{
+				if (!WriteString(fp.get(), jt))
+					return false;
+			}
+		}
+	}
+
+	return std::fflush(fp.get()) == 0;
+}
+
+static void Load()
+{
+	const std::string cache_filename(Path::CombineStdString(EmuFolders::Cache, GAMEDB_CACHE_FILE_NAME));
+	const s64 expected_mtime = GetExpectedMTime();
+
+	Common::Timer timer;
+
+	if (!FileSystem::FileExists(cache_filename.c_str()) || !CheckAndLoad(cache_filename.c_str(), expected_mtime))
+	{
+		Console.Warning("GameDB cache file does not exist or failed validation, recreating");
+		s_game_db.clear();
 
 		if (!LoadYamlFile())
 		{
@@ -278,7 +536,17 @@ void GameDatabase::EnsureLoaded()
 			return;
 		}
 
-		Console.WriteLn("[GameDB] %zu games on record (loaded in %.2fms)", s_game_db.size(), timer.GetTimeMilliseconds());
+		if (!SaveCache(cache_filename.c_str(), expected_mtime))
+			Console.Error("GameDB: Failed to save new cache");
+	}
+
+	Console.WriteLn("[GameDB] %zu games on record (loaded in %.2fms)", s_game_db.size(), timer.GetTimeMilliseconds());
+}
+
+void GameDatabase::EnsureLoaded()
+{
+	std::call_once(s_load_once_flag, []() {
+		Load();
 	});
 }
 

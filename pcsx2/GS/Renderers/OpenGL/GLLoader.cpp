@@ -15,8 +15,8 @@
 
 #include "PrecompiledHeader.h"
 #include "GLLoader.h"
-#include "GS/GS.h"
-#include <unordered_set>
+#include "GS.h"
+#include "Host.h"
 
 namespace GLExtension
 {
@@ -55,7 +55,6 @@ namespace ReplaceGL
 
 } // namespace ReplaceGL
 
-#ifdef _WIN32
 namespace Emulate_DSA
 {
 	// Texture entry point
@@ -80,6 +79,12 @@ namespace Emulate_DSA
 	{
 		BindTextureUnit(7, texture);
 		glTexSubImage2D(GL_TEXTURE_2D, level, xoffset, yoffset, width, height, format, type, pixels);
+	}
+
+	void APIENTRY CopyTextureSubImage(GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height)
+	{
+		BindTextureUnit(7, texture);
+		glCopyTexSubImage2D(GL_TEXTURE_2D, level, xoffset, yoffset, x, y, width, height);
 	}
 
 	void APIENTRY GetTexureImage(GLuint texture, GLint level, GLenum format, GLenum type, GLsizei bufSize, void* pixels)
@@ -120,6 +125,7 @@ namespace Emulate_DSA
 		glCreateTextures = CreateTexture;
 		glTextureStorage2D = TextureStorage;
 		glTextureSubImage2D = TextureSubImage;
+		glCopyTextureSubImage2D = CopyTextureSubImage;
 		glGetTextureImage = GetTexureImage;
 		glTextureParameteri = TextureParameteri;
 
@@ -127,7 +133,6 @@ namespace Emulate_DSA
 		glCreateSamplers = CreateSamplers;
 	}
 } // namespace Emulate_DSA
-#endif
 
 namespace GLLoader
 {
@@ -143,10 +148,17 @@ namespace GLLoader
 	bool vendor_id_amd = false;
 	bool vendor_id_nvidia = false;
 	bool vendor_id_intel = false;
+	bool vendor_id_arm = false;
+	bool vendor_id_qualcomm = false;
+	bool vendor_id_powervr = false;
 	bool mesa_driver = false;
 	bool in_replayer = false;
-	bool buggy_sso_dual_src = false;
+	bool buggy_pbo = false;
 
+  bool is_gles = false;
+	bool has_dual_source_blend = false;
+	bool has_clip_control = true;
+	bool found_framebuffer_fetch = false;
 	bool found_geometry_shader = true; // we require GL3.3 so geometry must be supported by default
 	bool found_GL_ARB_clear_texture = false;
 	// DX11 GPU
@@ -199,13 +211,23 @@ namespace GLLoader
 		return found;
 	}
 
-	void check_gl_version(int major, int minor)
+  void check_gl_version()
 	{
 		const char* vendor = (const char*)glGetString(GL_VENDOR);
+		const char* renderer = (const char*)glGetString(GL_RENDERER);
 		if (strstr(vendor, "Advanced Micro Devices") || strstr(vendor, "ATI Technologies Inc.") || strstr(vendor, "ATI"))
 			vendor_id_amd = true;
 		else if (strstr(vendor, "NVIDIA Corporation"))
 			vendor_id_nvidia = true;
+		else if (strstr(vendor, "ARM"))
+			vendor_id_arm = true;
+		else if (strstr(vendor, "Qualcomm"))
+			vendor_id_qualcomm = true;
+		else if (strstr(vendor, "Qualcomm"))
+			vendor_id_qualcomm = true;
+		else if (strstr(vendor, "Imagination Technologies") || strstr(renderer, "PowerVR"))
+			vendor_id_powervr = true;
+
 #ifdef _WIN32
 		else if (strstr(vendor, "Intel"))
 			vendor_id_intel = true;
@@ -213,8 +235,16 @@ namespace GLLoader
 		// On linux assumes the free driver if it isn't nvidia or amd pro driver
 		mesa_driver = !vendor_id_nvidia && !vendor_id_amd;
 #endif
-		// As of 2019 SSO is still broken on intel (Kaby Lake confirmed).
-		buggy_sso_dual_src = vendor_id_intel || vendor_id_amd;
+
+		if (vendor_id_powervr || vendor_id_qualcomm || vendor_id_arm)
+		{
+			Host::AddOSDMessage("Disabling PBO texture uploads and geometry shaders.", 5.0f);
+
+			// PBO uploads with texture sub image are broken on Adreno.
+			// geometry shaders are broken on qualcomm (index out of range error) due to gl_in[]
+			found_geometry_shader = false;
+			buggy_pbo = true;
+		}
 
 		if (theApp.GetConfigI("override_geometry_shader") != -1)
 		{
@@ -227,9 +257,9 @@ namespace GLLoader
 		GLint minor_gl = 0;
 		glGetIntegerv(GL_MAJOR_VERSION, &major_gl);
 		glGetIntegerv(GL_MINOR_VERSION, &minor_gl);
-		if ((major_gl < major) || (major_gl == major && minor_gl < minor))
+    if (!GLAD_GL_VERSION_3_3 && !GLAD_GL_ES_VERSION_3_1)
 		{
-			fprintf(stderr, "OpenGL %d.%d is not supported. Only OpenGL %d.%d\n was found", major, minor, major_gl, minor_gl);
+      fprintf(stderr, "OpenGL is not supported. Only OpenGL %d.%d\n was found", major_gl, minor_gl);
 			throw GSRecoverableError();
 		}
 	}
@@ -246,6 +276,7 @@ namespace GLLoader
 		}
 
 		// Mandatory for both renderer
+    if (GLAD_GL_VERSION_3_3)
 		{
 			// GL4.1
 			mandatory("GL_ARB_separate_shader_objects");
@@ -258,18 +289,12 @@ namespace GLLoader
 			mandatory("GL_ARB_buffer_storage");
 		}
 
-		// Only for HW renderer
-		if (theApp.GetCurrentRendererType() == GSRendererType::OGL_HW)
-		{
-			mandatory("GL_ARB_copy_image");
-			mandatory("GL_ARB_clip_control");
-		}
-
 		// Extra
 		{
 			// Bonus
 			optional("GL_ARB_sparse_texture");
 			optional("GL_ARB_sparse_texture2");
+			has_clip_control = optional("GL_ARB_clip_control");
 			// GL4.0
 			found_GL_ARB_gpu_shader5 = optional("GL_ARB_gpu_shader5");
 			// GL4.2
@@ -285,6 +310,10 @@ namespace GLLoader
 #ifdef GL_EXT_TEX_SUB_IMAGE
 			found_GL_ARB_get_texture_sub_image = optional("GL_ARB_get_texture_sub_image");
 #endif
+
+			found_framebuffer_fetch = GLAD_GL_EXT_shader_framebuffer_fetch || GLAD_GL_ARM_shader_framebuffer_fetch;
+			if (theApp.GetConfigB("disable_framebuffer_fetch"))
+				found_framebuffer_fetch = false;
 		}
 
 		if (vendor_id_amd)
@@ -315,13 +344,30 @@ namespace GLLoader
 			fprintf_once(stderr, "GL_ARB_texture_barrier is not supported! Blending emulation will not be supported\n");
 		}
 
-#ifdef _WIN32
+		if (is_gles)
+		{
+			has_dual_source_blend = GLAD_GL_EXT_blend_func_extended || GLAD_GL_ARB_blend_func_extended;
+			if (!has_dual_source_blend)
+			{
+				Host::AddOSDMessage("Dual-source blending is not supported, this will affect performance.", 5.0f);
+				Console.Warning("Dual source blending is missing");
+			}
+			if (!has_dual_source_blend && !found_framebuffer_fetch)
+			{
+				Host::AddOSDMessage("Both dual source blending and framebuffer fetch are missing, things will be broken.", 10.0f);
+				Console.Error("Missing both dual-source blending and framebuffer fetch");
+			}
+		}
+		else
+		{
+			has_dual_source_blend = true;
+		}
+
 		// Thank you Intel for not providing support of basic features on your IGPUs.
-		if (!GLExtension::Has("GL_ARB_direct_state_access"))
+    if (!GLAD_GL_ARB_direct_state_access)
 		{
 			Emulate_DSA::Init();
 		}
-#endif
 	}
 
 	bool is_sparse2_compatible(const char* name, GLenum internal_fmt, int x_max, int y_max)
@@ -388,9 +434,9 @@ namespace GLLoader
 		fprintf_once(stdout, "INFO: sparse depth texture is %s\n", found_compatible_sparse_depth ? "available" : "NOT SUPPORTED");
 	}
 
-	void check_gl_requirements()
-	{
-		check_gl_version(3, 3);
+  void check_gl_requirements()
+  {
+    check_gl_version();
 
 		check_gl_supported_extension();
 

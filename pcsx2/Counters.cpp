@@ -19,7 +19,6 @@
 #include <time.h>
 #include <cmath>
 
-#include "gui/App.h"
 #include "Common.h"
 #include "R3000A.h"
 #include "Counters.h"
@@ -28,9 +27,15 @@
 #include "GS.h"
 #include "VUmicro.h"
 #include "PerformanceMetrics.h"
+#include "VMManager.h"
+#include "Patch.h"
 
 #include "ps2/HwInternal.h"
 #include "Sio.h"
+
+#ifndef PCSX2_CORE
+#include "gui/App.h"
+#endif
 
 #ifndef DISABLE_RECORDING
 #	include "Recording/InputRecordingControls.h"
@@ -283,6 +288,12 @@ const char* ReportVideoMode()
 	}
 }
 
+const char* ReportInterlaceMode()
+{
+	const u64& smode2 = *(u64*)PS2GS_BASE(GS_SMODE2);
+	return (smode2 & 1) ? ((smode2 & 2) ? "Interlaced (Frame)" : "Interlaced (Field)") : "Progressive";
+}
+
 double GetVerticalFrequency()
 {
 	// Note about NTSC/PAL "double strike" modes:
@@ -419,7 +430,11 @@ void frameLimitReset()
 // Convenience function to update UI thread and set patches. 
 static __fi void frameLimitUpdateCore()
 {
+#ifndef PCSX2_CORE
 	GetCoreThread().VsyncInThread();
+#else
+	VMManager::Internal::VSyncOnCPUThread();
+#endif
 	Cpu->CheckExecutionState();
 }
 
@@ -429,7 +444,7 @@ static __fi void frameLimitUpdateCore()
 static __fi void frameLimit()
 {
 	// Framelimiter off in settings? Framelimiter go brrr.
-	if (!EmuConfig.GS.FrameLimitEnable)
+	if (EmuConfig.GS.LimitScalar == 0.0)
 	{
 		frameLimitUpdateCore();
 		return;
@@ -459,12 +474,14 @@ static __fi void frameLimit()
 		Threading::Sleep(msec - 1);
 	}
 	
+#ifndef __ANDROID__
 	// Conversion to milliseconds loses some precision; after sleeping off whole milliseconds,
 	// spin the thread without sleeping until we finally reach our expected end time.
 	while (GetCPUTicks() < uExpectedEnd)
 	{
 		// SKREEEEEEEE
 	}
+#endif
 
 	// Finally, set our next frame start to when this one ends
 	m_iStart = uExpectedEnd;

@@ -79,6 +79,9 @@ void MSW_OutputDebugString(const wxString& text)
 	static bool hasDebugger = wxIsDebuggerRunning();
 	if (hasDebugger)
 		OutputDebugString(text);
+
+	fputs(text.utf8_str(), stdout);
+	fflush(stdout);
 #else
 	fputs(text.utf8_str(), stdout_fp);
 	fflush(stdout_fp);
@@ -470,28 +473,6 @@ bool IConsoleWriter::Warning(const wxString fmt, ...) const
 	return false;
 }
 
-bool IConsoleWriter::WriteLn(ConsoleColors color, const std::string& str) const
-{
-	ConsoleColorScope cs(color);
-	return WriteLn(str);
-}
-
-bool IConsoleWriter::WriteLn(const std::string& str) const
-{
-	DoWriteLn(_addIndentation(fromUTF8(str), conlog_Indent));
-
-	return false;
-}
-
-bool IConsoleWriter::Error(const std::string& str) const
-{
-	return WriteLn(Color_StrongRed, str);
-}
-
-bool IConsoleWriter::Warning(const std::string& str) const
-{
-	return WriteLn(Color_StrongOrange, str);
-}
 
 // --------------------------------------------------------------------------------------
 //  ConsoleColorScope / ConsoleIndentScope
