@@ -115,8 +115,6 @@
 /* Define to 1 if the system has the type `_Bool'. */
 #define HAVE__BOOL 1
 
-#ifdef _WIN32
-
 #ifdef _M_IX86
 /* Define to 1 when using Windows 95 (and thus XP) compatible threads. This
    avoids use of features that were added in Windows Vista.
@@ -127,12 +125,6 @@
 /* Define to 1 when using Windows Vista compatible threads. This uses features
    that are not available on Windows XP. */
 #define MYTHREAD_VISTA 1
-#endif
-
-#else
-
-#define MYTHREAD_POSIX 1
-
 #endif
 
 /* Define to 1 to disable debugging code. */

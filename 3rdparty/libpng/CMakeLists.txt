@@ -17,6 +17,5 @@ add_library(png
 )
 
 target_link_libraries(png PRIVATE ZLIB::ZLIB)
-target_compile_definitions(png PRIVATE "PNG_ARM_NEON_OPT=0")
 target_include_directories(png PUBLIC .)
 add_library(PNG::PNG ALIAS png)
