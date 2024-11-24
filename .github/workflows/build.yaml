@@ -45,10 +45,6 @@ jobs:
                   cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=$HOME/android-ndk-r23c/build/cmake/android.toolchain.cmake -DANDROID_PLATFORM=android-26 -DANDROID_ABI=arm64-v8a 
                   make -j8
 
-            #             - name: Fetch public keystore
-            #               run: wget https://github.com/tytydraco/public-keystore/raw/main/public.jks
-            #               shell: bash
-
             - name: Create android build with shell apk
               run: |
                   mkdir -p apk/lib/arm64-v8a
@@ -57,15 +53,13 @@ jobs:
                   cd apk
                   zip -0 purplesx2.apk lib/arm64-v8a/libemucore.so
                   zipalign -p 4 purplesx2.apk purplesx2-aligned.apk
-
-            #             - name: Sign APK
-            #               run: |
-            #                   apksigner="$(find $ANDROID_SDK_ROOT/build-tools -name apksigner | sort -r | head -n 1)"
-            #                   "$apksigner" sign --ks public.jks --ks-key-alias public --ks-pass pass:public --key-pass pass:public --in ./app/build/outputs/apk/debug/app-debug.apk --out ./app/build/outputs/apk/debug/app-debug.apk
-            #               shell: bash
+                  curl -L https://github.com/tytydraco/public-keystore/raw/main/public.jks -o public.jks
+                  apksigner="$(find $ANDROID_SDK_ROOT/build-tools -name apksigner | sort -r | head -n 1)"
+                  "$apksigner" sign --ks public.jks --ks-key-alias public --ks-pass pass:public --key-pass pass:public --in ./purplesx2-aligned.apk --out ./purplesx2-signed.apk
+              shell: bash
 
             - name: Upload APK
               uses: actions/upload-artifact@v4
               with:
                   name: shell-apk
-                  path: ./apk/purplesx2-aligned.apk
+                  path: ./apk/purplesx2-signed.apk
